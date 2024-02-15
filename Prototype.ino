@@ -1,25 +1,58 @@
 #include <LiquidCrystal.h>
-#define game1 snake
-#define game2 pong
-#define game3 doom
+
+#define LCDCOLUMNS 16
+#define LCDROWS 2
 
 LiquidCrystal lcd = LiquidCrystal(7, 6, 5, 4, 3, 2);
-enum MainLoop = { selection, game1, game2, game3 };
-enum GameStates = { unactivated = 0, activated = 1, running = 2, failure = 4 };
+enum LCDAlignment { left, center, right };
 
-MainLoop main = selection;
+struct LCDtext {
+  LCDtext(String text, LCDAlignment align);
+  String text;
+  LCDAlignment align; 
+};
+
+enum EmuState { selection, snake, pong, doom };
+enum GameStates { unactivated = 0, activated = 1, running = 2, failure = 4 };
+
+EmuState emu = selection;
 GameStates game1 = unactivated;
 GameStates game2 = unactivated;
 GameStates game3 = unactivated;
 
 void setup() {
-  lcd.begin(16, 2);
+  // lcd init
+  lcd.begin(LCDCOLUMNS, LCDROWS);
+  lcd.noCursor();
+  lcd.clear();
 
   // prevent main loop from starting if vars aren't initialized properly
-  while (game1 != unactivated || game2 != unactivated || game3 != unactivated);
+  while (emu != selection || game1 != unactivated || game2 != unactivated || game3 != unactivated);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  // main game state 
+  switch (emu) {
+    case (selection):
+      break;
+    case (snake):
+      break;
+    case (pong):
+      break;
+    case (doom):
+      break;
+    default:
+      break;
+  }
 
+}
+
+// Writes input String a to column 1 and String b to column 2
+void DisplayWrite(/*std::intializer_list<LCDtext> args*/) {
+  /*
+  lcd.setCursor(0,0);
+  lcd.print();
+  lcd.setCursor(0,1);
+  lcd.print();
+  */
 }
