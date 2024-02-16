@@ -1,5 +1,10 @@
 #include <LiquidCrystal.h>
 
+// BITMAPS
+#include "Bitmaps/SnakeMenuPlay.h"
+#include "Bitmaps/SnakeMenuQuit.h"
+
+
 #define LCDCOLUMNS 16
 #define LCDROWS 2
 
