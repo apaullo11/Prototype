@@ -1,3 +1,5 @@
+#include <Adafruit_SSD1306.h>
+#include <splash.h>
 #include <LiquidCrystal.h>
 
 // BITMAPS
@@ -37,7 +39,7 @@ void setup() {
   lcd.noCursor();
   lcd.clear();
 
-  LCDWrite(lcd, LCDText("Left",left), LCDText("Right",right));
+  LCDPrint(lcd, LCDText("Left",left), LCDText("Right",right));
 
   // prevent main loop from starting if vars aren't initialized properly
   while (emu != selection || game1 != unactivated || game2 != unactivated || game3 != unactivated);
@@ -82,10 +84,10 @@ LCDText::LCDText(String t, LCDAlignment a) {
   align = a;
 }
 
-// Writes Strings to an input LCD display and adjusts the text positioning based on an input LCDText data structure
+// Prints Strings to an input LCD display and adjusts the text positioning based on an input LCDText data structure
 // - Text that is longer than the column number will be cut off (limited to a max of 128 columns)
 // - Any args provided that surpass the row number will not be used (limited to a max of 128 rows)
-void LCDWrite(LiquidCrystal LCD, LCDText t, ...) {
+void LCDPrint(LiquidCrystal LCD, LCDText t, ...) {
   // prepare list of all args
   va_list list;
   va_start(list, t);
@@ -114,7 +116,7 @@ void LCDWrite(LiquidCrystal LCD, LCDText t, ...) {
         break;
     }
     LCD.setCursor(indent,i);
-    LCD.write(t.text.c_str());
+    LCD.print(t.text.c_str());
 
     // to next LCDText object
     va_arg(list, LCDText);
