@@ -10,11 +10,13 @@
   //#include "Bitmaps/SnakeMenuQuit.h"
 //---- END OF LIBRARIES AND INCLUDE FILES ----//
 
-// Screen Dimension Definitions
+// Screen Definitions
 #define LCDCOLUMNS        16
 #define LCDROWS           2
 #define OLEDWIDTH         128
 #define OLEDHEIGHT        64
+#define OLEDLETTERW       6
+#define OLEDLETTERH       8
 
 //---- PIN DEFINITIONS ----//
   // LCD Display
@@ -36,7 +38,7 @@
 //---- DATA STRUCTURING ----//
   // ENUM DEFS
   enum LCDAlignment       { left, center, right };
-  enum EmuState           { selection, snake, pong, doom };
+  enum EmulatorState      { selection, snake, pong, doom };
   enum GameStates         { unactivated, activated, playing, failure = -1 };
 
   struct LCDText {
@@ -45,13 +47,16 @@
     String text = "";
     // Preferred alignment of the text on the LCD display (left by default)
     LCDAlignment align = left; 
+    // Row String is to be printed to
+    // int row = 0
   };
 //---- END OF DATA STRUCTURES ----//
 
 Adafruit_SSD1306 OLED(OLEDWIDTH, OLEDHEIGHT);
 LiquidCrystal lcd = LiquidCrystal(LCDRS, LCDENABLE, D4, D5, D6, D7);
 
-EmuState emu = selection;
+EmulatorState emu = selection;
+EmulatorState select;
 GameStates game1 = unactivated;
 GameStates game2 = unactivated;
 GameStates game3 = unactivated;
@@ -73,15 +78,16 @@ void loop() {
   switch (emu) {
     // game selection state
     case (selection):
-    
+
     break;
 
     case (snake):
       switch (game1) {
         // boot game
         case (unactivated):
-
           game1 = activated;
+          LCDRunGame();
+          MainMenu(snake);
         break;
 
         // Menu Selection
@@ -100,12 +106,60 @@ void loop() {
         default:
         break;
       }
-      break;
+    break;
 
     case (pong):
+      switch (game2) {
+        // boot game
+        case (unactivated):
+          
+          game2 = activated;
+          LCDRunGame();
+        break;
+
+        // Menu Selection
+        case (activated):
+        
+        break;
+
+        // game loop
+        case (playing):
+        break;
+
+        // game over
+        case (failure):
+        break;
+
+        default:
+        break;
+      }
     break;
 
     case (doom):
+      switch (game3) {
+        // boot game
+        case (unactivated):
+          
+          game3 = activated;
+          LCDRunGame();
+        break;
+
+        // Menu Selection
+        case (activated):
+        
+        break;
+
+        // game loop
+        case (playing):
+        break;
+
+        // game over
+        case (failure):
+        break;
+
+        default:
+        break;
+      }
     break;
 
     default:
@@ -114,17 +168,56 @@ void loop() {
 
 }
 
-/*
-template <typename T>
-int arrSize(T t[]) {
-  return t/sizeOf(T);
-}
-*/
-
 // LCDText object constructor with String and LCDAlignment inputs to set initial vars
-LCDText::LCDText(String t, LCDAlignment a) {
+LCDText::LCDText(String t, LCDAlignment a) { //, int r) {
   text = t;
   align = a;
+  // row = r
+}
+
+void MainMenu(EmulatorState game) {
+  OLED.clearDisplay();
+  OLED.drawRect(0, 0, OLEDWIDTH, OLEDHEIGHT, 1);
+  OLED.setTextColor(1);
+  OLED.setTextSize(3);
+
+  uint8_t letters = 0;
+  switch (game) {
+    case (snake):
+      letters = 5;
+    break;
+    case (pong):
+      letters = 4;
+    break;
+    case (doom):
+      letters = 4;
+    break;
+  }
+
+  uint8_t padding[2] = {0,0}; 
+  // center game title text horizontally
+  padding[0] = (OLEDWIDTH - (letters * 3 * OLEDLETTERW)) / 2;
+  // have bottom line of text on middle horizontal
+  padding[1] = (OLEDHEIGHT / 2) - (letters * 3 * OLEDLETTERH);
+  
+  switch (game) {
+    case (snake):
+      OLED.write("Snake");
+    break;
+    case (pong):
+      OLED.write("Pong");
+    break;
+    case (doom):
+      OLED.write("Doom");
+    break;
+  }
+
+  OLED.setTextSize(2);
+  
+}
+
+void LCDRunGame() {
+  LCDPrint(lcd, LCDText("Running:",center));
 }
 
 // Prints Strings to an input LCD display and adjusts the text positioning based on an input LCDText data structure
