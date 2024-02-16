@@ -1,32 +1,55 @@
-#include <Adafruit_SSD1306.h>
-#include <splash.h>
-#include <LiquidCrystal.h>
+//---- LIBRARIES AND INCLUDE FILES ----//
+  #pragma once
+  // Libraries
+  #include <Adafruit_SSD1306.h>
+  #include <splash.h>
+  #include <LiquidCrystal.h>
 
-// BITMAPS
-#include "Bitmaps/SnakeMenuPlay.h"
-#include "Bitmaps/SnakeMenuQuit.h"
+  // BITMAPS
+  //#include "Bitmaps/SnakeMenuPlay.h"
+  //#include "Bitmaps/SnakeMenuQuit.h"
+//---- END OF LIBRARIES AND INCLUDE FILES ----//
 
+// Screen Dimension Definitions
+#define LCDCOLUMNS        16
+#define LCDROWS           2
+#define OLEDWIDTH         128
+#define OLEDHEIGHT        64
 
-#define LCDCOLUMNS 16
-#define LCDROWS 2
+//---- PIN DEFINITIONS ----//
+  // LCD Display
+  #define LCDRS           7
+  #define LCDENABLE       6
+  #define D4              5
+  #define D5              4
+  #define D6              3
+  #define D7              2
+  // OLED Display (Definitions not used - just for reference)
+  #define SDA             A4
+  #define SCL             A5
+  // Mechanical
+  #define JOYSTICKXPIN    A0
+  #define JOYSTICKYPIN    A1
+  #define JOYSTICKCLK     8
+//---- END OF PIN DEFINITIONS ----//
 
-#define JOYSTICKXPIN A0
-#define JOYSTICKYPIN A1
-#define JOYSTICKCLK 7
+//---- DATA STRUCTURING ----//
+  // ENUM DEFS
+  enum LCDAlignment       { left, center, right };
+  enum EmuState           { selection, snake, pong, doom };
+  enum GameStates         { unactivated, activated, playing, failure = -1 };
 
-LiquidCrystal lcd = LiquidCrystal(7, 6, 5, 4, 3, 2);
-enum LCDAlignment { left, center, right };
+  struct LCDText {
+    LCDText(String t, LCDAlignment a);
+    // String to be printed to the LCD display
+    String text = "";
+    // Preferred alignment of the text on the LCD display (left by default)
+    LCDAlignment align = left; 
+  };
+//---- END OF DATA STRUCTURES ----//
 
-struct LCDText {
-  LCDText(String t, LCDAlignment a);
-  // String to be printed to the LCD display
-  String text = "";
-  // Preferred alignment of the text on the LCD display (left by default)
-  LCDAlignment align = left; 
-};
-
-enum EmuState { selection, snake, pong, doom };
-enum GameStates { unactivated, activated, playing, failure = -1 };
+Adafruit_SSD1306 OLED(OLEDWIDTH, OLEDHEIGHT);
+LiquidCrystal lcd = LiquidCrystal(LCDRS, LCDENABLE, D4, D5, D6, D7);
 
 EmuState emu = selection;
 GameStates game1 = unactivated;
@@ -41,7 +64,7 @@ void setup() {
 
   LCDPrint(lcd, LCDText("Left",left), LCDText("Right",right));
 
-  // prevent main loop from starting if vars aren't initialized properly
+  // prevent main loop from starting if state vars aren't initialized properly
   while (emu != selection || game1 != unactivated || game2 != unactivated || game3 != unactivated);
 }
 
@@ -50,23 +73,43 @@ void loop() {
   switch (emu) {
     // game selection state
     case (selection):
-
-      break;
+    
+    break;
 
     case (snake):
-      switch (game1)
+      switch (game1) {
+        // boot game
         case (unactivated):
 
+          game1 = activated;
+        break;
+
+        // Menu Selection
+        case (activated):
+        
+        break;
+
+        // game loop
+        case (playing):
+        break;
+
+        // game over
+        case (failure):
+        break;
+
+        default:
+        break;
+      }
       break;
 
     case (pong):
-      break;
+    break;
 
     case (doom):
-      break;
+    break;
 
     default:
-      break;
+    break;
   }
 
 }
