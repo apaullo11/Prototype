@@ -29,10 +29,12 @@
   // OLED Display (Definitions not used - just for reference)
   #define SDA             A4
   #define SCL             A5
-  // Mechanical
+  // Interactive
   #define JOYSTICKXPIN    A0
   #define JOYSTICKYPIN    A1
   #define JOYSTICKCLK     8
+  #define ROTARYENCPINA   9
+  #define ROTARYENCPINB   10
 //---- END OF PIN DEFINITIONS ----//
 
 //---- DATA STRUCTURING ----//
@@ -44,9 +46,9 @@
   struct LCDText {
     LCDText(String t, LCDAlignment a);
     // String to be printed to the LCD display
-    String text = "";
+    String text;
     // Preferred alignment of the text on the LCD display (left by default)
-    LCDAlignment align = left; 
+    LCDAlignment align; 
     // Row String is to be printed to
     // int row = 0
   };
@@ -78,7 +80,7 @@ void loop() {
   switch (emu) {
     // game selection state
     case (selection):
-      
+
     break;
 
     case (snake):
@@ -220,6 +222,18 @@ void LCDRunGame(EmulatorState game) {
   LCDPrint(lcd, LCDText("Running:",center));
 
   DrawGameMenu(game);
+}
+
+// Polls the Rotary Encoder Pins and returns the state number
+// - Pin A has a value of 1; Pin B is bit shifted to a value of 2; OR operator to combine
+// - 3 is both HIGH; 1 is only A HIGH; 0 is both LOW; 2 is B HIGH
+uint8_t GetRotaryState() {
+  return digitalRead(ROTARYENCPINA) | (digitalRead(ROTARYENCPINB)<<1);
+}
+
+int8_t PollRotaryEnc() {
+
+  while (false);
 }
 
 // Prints Strings to an input LCD display and adjusts the text positioning based on an input LCDText data structure
