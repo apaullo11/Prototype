@@ -52,6 +52,8 @@
     // Row String is to be printed to
     // int row = 0
   };
+
+  uint8_t rotEncPos       = 0;
 //---- END OF DATA STRUCTURES ----//
 
 Adafruit_SSD1306 OLED(OLEDWIDTH, OLEDHEIGHT);
@@ -201,6 +203,8 @@ void DrawGameMenu(EmulatorState game) {
   // have bottom line of text on middle horizontal
   padding[1] = (OLEDHEIGHT / 2) - (letters * 3 * OLEDLETTERH);
   
+  OLED.setCursor(padding[0], padding[1]);
+
   switch (game) {
     case (snake):
       OLED.write("Snake");
@@ -224,16 +228,37 @@ void LCDRunGame(EmulatorState game) {
   DrawGameMenu(game);
 }
 
-// Polls the Rotary Encoder Pins and returns the state number
-// - Pin A has a value of 1; Pin B is bit shifted to a value of 2; OR operator to combine
-// - 3 is both HIGH; 1 is only A HIGH; 0 is both LOW; 2 is B HIGH
-uint8_t GetRotaryState() {
-  return digitalRead(ROTARYENCPINA) | (digitalRead(ROTARYENCPINB)<<1);
+int8_t GetScrollDir() {
+  uint8_t oldState;
+  // Ensure encoder is at default state before polling begins
+  do {
+    oldState = GetRotaryState(ROTARYENCPINA, ROTARYENCPINB);
+  } while ( oldState != 3);
 }
 
-int8_t PollRotaryEnc() {
+// Checks the Rotary Encoder Pins and returns the state number
+// - Pin A has a value of 1; Pin B is bit shifted to a value of 2; OR operator to combine
+// - 3 is both HIGH; 1 is only A HIGH; 0 is both LOW; 2 is B HIGH
+uint8_t GetRotaryState(const uint8_t PinA, const uint8_t PinB) {
+  return digitalRead(PinA) | ( digitalRead(PinB)<<1 );
+}
 
-  while (false);
+// Polls Rotary Encoder Pins until a change in state is detected
+// 
+int8_t GetRotaryStateChange(uint8_t oldState, const uint8_t PinA, const uint8_t PinB) {
+  uint8_t curState;
+  bool bStateChanged = false;
+  
+  curState = GetRotaryState(PinA, PinB);
+  
+  const int8_t KNOBDIR[] = {
+    0, -1,  1,  0,
+    1,  0,  0, -1,
+   -1,  0,  0,  1,
+    0,  1, -1,  0
+  };
+
+  return KNOBDIR[ curState | (oldState<<2) ];
 }
 
 // Prints Strings to an input LCD display and adjusts the text positioning based on an input LCDText data structure
