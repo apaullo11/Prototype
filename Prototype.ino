@@ -237,15 +237,15 @@ int8_t GetScrollDir() {
 }
 
 // Checks the Rotary Encoder Pins and returns the state number
-// - Pin A has a value of 1; Pin B is bit shifted to a value of 2; OR operator to combine
-// - 3 is both HIGH; 1 is only A HIGH; 0 is both LOW; 2 is B HIGH
+// - Pin A has a value of 1; Pin B is bit shifted to a value of 2; OR bit operator to combine into one var
+// - 3 is both HIGH; 1 is only A HIGH; 0 is both LOW; 2 is B HIGH || 4 states in 2 bits
 uint8_t GetRotaryState(const uint8_t PinA, const uint8_t PinB) {
   return digitalRead(PinA) | ( digitalRead(PinB)<<1 );
 }
 
-// Polls Rotary Encoder Pins until a change in state is detected
-// 
-int8_t GetRotaryStateChange(uint8_t oldState, const uint8_t PinA, const uint8_t PinB) {
+// Returns the direction a Rotary Encoder has been turned based off an input original state and the Pin numbers
+// - Returns 1,-1, or 0, where 1 is CW, -1 is CCW, and 0 is no movement
+int8_t GetRotaryKnobDir(uint8_t oldState, const uint8_t PinA, const uint8_t PinB) {
   uint8_t curState;
   bool bStateChanged = false;
   
@@ -258,6 +258,8 @@ int8_t GetRotaryStateChange(uint8_t oldState, const uint8_t PinA, const uint8_t 
     0,  1, -1,  0
   };
 
+  // Takes advantage of the 2-bit encoder state representation by combining the two vars with one bitshifted
+  // This creates 16 unique states that can be resolved into different directions 
   return KNOBDIR[ curState | (oldState<<2) ];
 }
 
