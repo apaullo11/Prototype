@@ -38,7 +38,7 @@
 //---- DATA STRUCTURING ----//
   // ENUM DEFS
   enum LCDAlignment       { left, center, right };
-  enum EmulatorState      { selection, snake, pong, doom };
+  enum EmulatorState      { selection, snake, pong, tron, doom };
   enum GameStates         { unactivated, activated, playing, failure = -1 };
 
   struct LCDText {
@@ -78,7 +78,7 @@ void loop() {
   switch (emu) {
     // game selection state
     case (selection):
-
+      
     break;
 
     case (snake):
@@ -86,8 +86,7 @@ void loop() {
         // boot game
         case (unactivated):
           game1 = activated;
-          LCDRunGame();
-          MainMenu(snake);
+          LCDRunGame(snake);
         break;
 
         // Menu Selection
@@ -114,7 +113,7 @@ void loop() {
         case (unactivated):
           
           game2 = activated;
-          LCDRunGame();
+          LCDRunGame(pong);
         break;
 
         // Menu Selection
@@ -135,13 +134,13 @@ void loop() {
       }
     break;
 
-    case (doom):
+    case (tron):
       switch (game3) {
         // boot game
         case (unactivated):
           
           game3 = activated;
-          LCDRunGame();
+          LCDRunGame(tron);
         break;
 
         // Menu Selection
@@ -175,7 +174,7 @@ LCDText::LCDText(String t, LCDAlignment a) { //, int r) {
   // row = r
 }
 
-void MainMenu(EmulatorState game) {
+void DrawGameMenu(EmulatorState game) {
   OLED.clearDisplay();
   OLED.drawRect(0, 0, OLEDWIDTH, OLEDHEIGHT, 1);
   OLED.setTextColor(1);
@@ -214,10 +213,13 @@ void MainMenu(EmulatorState game) {
 
   OLED.setTextSize(2);
   
+
 }
 
-void LCDRunGame() {
+void LCDRunGame(EmulatorState game) {
   LCDPrint(lcd, LCDText("Running:",center));
+
+  DrawGameMenu(game);
 }
 
 // Prints Strings to an input LCD display and adjusts the text positioning based on an input LCDText data structure
