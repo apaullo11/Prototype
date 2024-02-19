@@ -65,7 +65,7 @@ Adafruit_SSD1306 OLED(OLEDWIDTH, OLEDHEIGHT);
 LiquidCrystal lcd = LiquidCrystal(LCDRS, LCDENABLE, D4, D5, D6, D7);
 
 EmulatorState emu = selection;
-EmulatorState gameSelect;
+EmulatorState gameSelect = snake;
 GameStates game1 = unactivated;
 GameStates game2 = unactivated;
 GameStates game3 = unactivated;
@@ -90,7 +90,21 @@ void loop() {
   switch (emu) {
     // game selection state
     case (selection):
-      
+      RotaryEncoder rotEncInput = PollRotaryEnc();
+      switch (rotEncInput) {
+        // Game is selected
+        case (clk):
+        break;
+
+        case (none):
+        break;
+
+        // Rotary Encoder turned cw or ccw
+        default:
+          // EmulatorStates game states start at 1 and not 0 -> decrement 1 before modulus and increment 1 after 
+          gameSelect = EmulatorState( ((int(gameSelect) -1 + int(rotEncInput)) % 3) + 1 )
+        break;
+      }
     break;
 
     case (snake):
