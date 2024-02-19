@@ -35,6 +35,7 @@
   #define JOYSTICKCLK     8
   #define ROTARYENCPINA   9
   #define ROTARYENCPINB   10
+  #define ROTARYENCCLK    11
 //---- END OF PIN DEFINITIONS ----//
 
 //---- DATA STRUCTURING ----//
@@ -42,6 +43,7 @@
   enum LCDAlignment       { left, center, right };
   enum EmulatorState      { selection, snake, pong, tron, doom };
   enum GameStates         { unactivated, activated, playing, failure = -1 };
+  enum RotaryEncoder      { ccw = -1, none, cw, clk };
 
   struct LCDText {
     LCDText(String t, LCDAlignment a);
@@ -53,14 +55,17 @@
     // int row = 0
   };
 
-  uint8_t rotEncPos       = 0;
+  int rotEncPos = 0;
+  int8_t rotEncDir = 0;
+  uint8_t rotEncState;
+  bool rotEncClk;
 //---- END OF DATA STRUCTURES ----//
 
 Adafruit_SSD1306 OLED(OLEDWIDTH, OLEDHEIGHT);
 LiquidCrystal lcd = LiquidCrystal(LCDRS, LCDENABLE, D4, D5, D6, D7);
 
 EmulatorState emu = selection;
-EmulatorState select;
+EmulatorState gameSelect;
 GameStates game1 = unactivated;
 GameStates game2 = unactivated;
 GameStates game3 = unactivated;
@@ -75,6 +80,9 @@ void setup() {
 
   // prevent main loop from starting if state vars aren't initialized properly
   while (emu != selection || game1 != unactivated || game2 != unactivated || game3 != unactivated);
+
+  rotEncState = GetRotaryState(ROTARYENCPINA, ROTARYENCPINB);
+  rotEncClk = digitalRead(ROTARYENCCLK);
 }
 
 void loop() {
@@ -82,7 +90,7 @@ void loop() {
   switch (emu) {
     // game selection state
     case (selection):
-
+      
     break;
 
     case (snake):
@@ -219,6 +227,7 @@ void DrawGameMenu(EmulatorState game) {
 
   OLED.setTextSize(2);
   
+  // TODO - Draw PLAY & QUIT OPTIONS
 
 }
 
@@ -228,12 +237,19 @@ void LCDRunGame(EmulatorState game) {
   DrawGameMenu(game);
 }
 
-int8_t GetScrollDir() {
-  uint8_t oldState;
-  // Ensure encoder is at default state before polling begins
-  do {
-    oldState = GetRotaryState(ROTARYENCPINA, ROTARYENCPINB);
-  } while ( oldState != 3);
+// Polls the Rotary Encoder for changes in position or presses
+// - Rotating takes precedent over clicking
+RotaryEncoder PollRotaryEnc() {
+  rotEncDir += GetRotaryKnobDir(&rotEncState, ROTARYENCPINA, ROTARYENCPINB);
+  // if at rest pos and the direction total is greater than a 4 state dif in one direction
+  if ( (rotEncState == 3) && ( abs(rotEncDir) >= 4) ) {
+    return RotaryEncoder(rotEncDir>>2);
+  }
+
+  if ( (rotEncClk != digitalRead(ROTARYENCCLK)) && (rotEncClk == HIGH) ) {
+    rotEncClk = digitalRead(ROTARYENCCLK);
+    return clk;
+  }
 }
 
 // Checks the Rotary Encoder Pins and returns the state number
@@ -243,11 +259,11 @@ uint8_t GetRotaryState(const uint8_t PinA, const uint8_t PinB) {
   return digitalRead(PinA) | ( digitalRead(PinB)<<1 );
 }
 
-// Returns the direction a Rotary Encoder has been turned based off an input original state and the Pin numbers
-// - Returns 1,-1, or 0, where 1 is CW, -1 is CCW, and 0 is no movement
-int8_t GetRotaryKnobDir(uint8_t oldState, const uint8_t PinA, const uint8_t PinB) {
+// Returns the position a Rotary Encoder has been turned to based off an input original state and the Pin numbers
+// - Returns 1,-1, or 0 || 1 is CW, -1 is CCW, and 0 is no movement
+int8_t GetRotaryKnobDir(uint8_t *oldState, const uint8_t PinA, const uint8_t PinB) {
   uint8_t curState;
-  bool bStateChanged = false;
+  int8_t knobDir;
   
   curState = GetRotaryState(PinA, PinB);
   
@@ -260,7 +276,11 @@ int8_t GetRotaryKnobDir(uint8_t oldState, const uint8_t PinA, const uint8_t PinB
 
   // Takes advantage of the 2-bit encoder state representation by combining the two vars with one bitshifted
   // This creates 16 unique states that can be resolved into different directions 
-  return KNOBDIR[ curState | (oldState<<2) ];
+  knobDir = KNOBDIR[ curState | ( (*oldState)<<2 ) ];
+  
+  // changes input state variable to match current state
+  (*oldState) = curState;
+  return knobDir;
 }
 
 // Prints Strings to an input LCD display and adjusts the text positioning based on an input LCDText data structure
