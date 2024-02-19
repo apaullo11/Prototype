@@ -102,7 +102,7 @@ void loop() {
         // Rotary Encoder turned cw or ccw
         default:
           // EmulatorStates game states start at 1 and not 0 -> decrement 1 before modulus and increment 1 after 
-          gameSelect = EmulatorState( ((int(gameSelect) -1 + int(rotEncInput)) % 3) + 1 )
+          gameSelect = EmulatorState( ((int(gameSelect) -1 + int(rotEncInput)) % 3) + 1 );
         break;
       }
     break;
@@ -206,38 +206,14 @@ void DrawGameMenu(EmulatorState game) {
   OLED.setTextColor(1);
   OLED.setTextSize(3);
 
-  uint8_t letters = 0;
-  switch (game) {
-    case (snake):
-      letters = 5;
-    break;
-    case (pong):
-      letters = 4;
-    break;
-    case (doom):
-      letters = 4;
-    break;
-  }
-
   uint8_t padding[2] = {0,0}; 
   // center game title text horizontally
-  padding[0] = (OLEDWIDTH - (letters * 3 * OLEDLETTERW)) / 2;
+  padding[0] = (OLEDWIDTH - (EmuStateToString(game).length() * 3 * OLEDLETTERW)) / 2;
   // have bottom line of text on middle horizontal
-  padding[1] = (OLEDHEIGHT / 2) - (letters * 3 * OLEDLETTERH);
+  padding[1] = (OLEDHEIGHT / 2) - (EmuStateToString(game).length() * 3 * OLEDLETTERH);
   
   OLED.setCursor(padding[0], padding[1]);
-
-  switch (game) {
-    case (snake):
-      OLED.write("Snake");
-    break;
-    case (pong):
-      OLED.write("Pong");
-    break;
-    case (doom):
-      OLED.write("Doom");
-    break;
-  }
+  OLED.print(EmuStateToString(game));
 
   OLED.setTextSize(2);
   
@@ -245,8 +221,25 @@ void DrawGameMenu(EmulatorState game) {
 
 }
 
+String EmuStateToString (EmulatorState state) {
+  switch (state) {
+    case (snake):
+    return "Snake";
+    case (pong):
+    return "Pong";
+    case (tron):
+    return "Tron";
+    case (doom):
+    return "Doom";
+  }
+}
+
+void LCDGameSelect(EmulatorState game) {
+  LCDPrint(lcd, LCDText("Selected Game:", center), LCDText(EmuStateToString(game), center));
+}
+
 void LCDRunGame(EmulatorState game) {
-  LCDPrint(lcd, LCDText("Running:",center));
+  LCDPrint(lcd, LCDText("Running:", center));
 
   DrawGameMenu(game);
 }
