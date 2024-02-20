@@ -1,11 +1,10 @@
 #include <cstdint>
 
-template <typename T>
 class LinkedList {
   LinkedList();
   LinkedList(unsigned int size);
   unsigned int size = 0;
-  Node<T> *head, *tail;
+  Node *head, *tail;
   
   public:
   void removeNode(unsigned int index);
@@ -17,22 +16,18 @@ class LinkedList {
   void destroyList(uint8_t dir);
 };
 
-template <typename T>
 struct Node {
   Node();
   Node(Node *next, Node *prev);
   Node *next, *prev;
-  T *data;
 };
 
-template <typename T>
-LinkedList<T>::LinkedList() {
+LinkedList::LinkedList() {
   this->head = nullptr;
   this->tail = nullptr;
 }
 
-template <typename T>
-LinkedList<T>::LinkedList(unsigned int size) {
+LinkedList::LinkedList(unsigned int size) {
   Node *tempTail = nullptr; 
   for (unsigned int i = 0; i<size; i++) {
     if (tempTail == nullptr) {
@@ -71,20 +66,17 @@ void LinkedList::addNode(unsigned int index) {
 }
 */
 
-template <typename T>
-void LinkedList<T>::addFrontNode() {
+void LinkedList::addFrontNode() {
   this->head->next = new Node(nullptr, this->head);
   this->head = this->head->next;
 }
 
-template <typename T>
-void LinkedList<T>::addBackNode() {
+void LinkedList::addBackNode() {
   this->tail->prev = new Node(this->tail, nullptr);
   this->tail = this->tail->prev;
 }
 
-template <typename T>
-void LinkedList<T>::removeFrontNode() {
+void LinkedList::removeFrontNode() {
   Node *oldHead = this->head;
   // Set new head
   this->head = oldHead->prev;
@@ -94,8 +86,7 @@ void LinkedList<T>::removeFrontNode() {
   delete oldHead;
 }
 
-template <typename T>
-void LinkedList<T>::removeBackNode() {
+void LinkedList::removeBackNode() {
   Node *oldTail = this->tail;
   // Set new tail
   this->tail = oldTail->next;
@@ -105,8 +96,7 @@ void LinkedList<T>::removeBackNode() {
   delete oldTail;
 }
 
-template <typename T>
-void LinkedList<T>::destroyList(uint8_t dir) {
+void LinkedList::destroyList(uint8_t dir) {
   Node *n;
   if (dir<0) {
     n = this->tail;
@@ -133,14 +123,12 @@ void LinkedList<T>::destroyList(uint8_t dir) {
   }
 }
 
-template <typename T>
-Node<T>::Node() {
+Node::Node() {
   this->next = nullptr;
   this->prev = nullptr;
 }
 
-template <typename T>
-Node<T>::Node(Node *next, Node *prev) {
+Node::Node(Node *next, Node *prev) {
   this->next = next;
   this->prev = prev;
 }
