@@ -11,39 +11,40 @@
 //---- END OF LIBRARIES AND INCLUDE FILES ----//
 
 // Screen Definitions
-#define LCDCOLUMNS        16
-#define LCDROWS           2
-#define OLEDWIDTH         128
-#define OLEDHEIGHT        64
-#define OLEDLETTERW       6
-#define OLEDLETTERH       8
+#define LCDCOLUMNS            16
+#define LCDROWS               2
+#define OLEDWIDTH             128
+#define OLEDHEIGHT            64
+#define OLEDLETTERW           6
+#define OLEDLETTERH           8
 
 //---- PIN DEFINITIONS ----//
   // LCD Display
-  #define LCDRS           7
-  #define LCDENABLE       6
-  #define D4              5
-  #define D5              4
-  #define D6              3
-  #define D7              2
+  #define LCDRS               7
+  #define LCDENABLE           6
+  #define D4                  5
+  #define D5                  4
+  #define D6                  3
+  #define D7                  2
   // OLED Display (Definitions not used - just for reference)
-  #define SDA             A4
-  #define SCL             A5
+  #define SDA                 A4
+  #define SCL                 A5
   // Interactive
-  #define JOYSTICKXPIN    A0
-  #define JOYSTICKYPIN    A1
-  #define JOYSTICKCLK     8
-  #define ROTARYENCPINA   9
-  #define ROTARYENCPINB   10
-  #define ROTARYENCCLK    11
+  #define JOYSTICKXPIN        A0
+  #define JOYSTICKYPIN        A1
+  #define JOYSTICKCLK         8
+  #define ROTARYENCPINA       9
+  #define ROTARYENCPINB       10
+  #define ROTARYENCCLK        11
+  #define BUTTONPIN           12
 //---- END OF PIN DEFINITIONS ----//
 
 //---- DATA STRUCTURING ----//
   // ENUM DEFS
-  enum LCDAlignment       { left, center, right };
-  enum EmulatorState      { selection, snake, pong, tron, doom };
-  enum GameStates         { unactivated, activated, playing, failure = -1 };
-  enum RotaryEncoder      { ccw = -1, none, cw, clk };
+  enum LCDAlignment           { left, center, right };
+  enum EmulatorState          { selection, snake, pong, tron, doom };
+  enum GameStates             { unactivated, activated, playing, failure = -1 };
+  enum RotaryEncoder          { ccw = -1, none, cw, clk };
 
   struct LCDText {
     LCDText(String t, LCDAlignment a);
@@ -55,10 +56,28 @@
     // int row = 0
   };
 
+  struct OLEDPixel {
+    OLEDPixel() {};
+    OLEDPixel(int16_t x, int16_t y); //, int16_t color);
+    //
+    int16_t x, y;
+  };
+
+  struct SnakeNode {
+    SnakeNode(OLEDPixel pos, OLEDPixel dir);
+    OLEDPixel pos;
+    OLEDPixel dir;
+  };
+
   int rotEncPos = 0;
   int8_t rotEncDir = 0;
   uint8_t rotEncState;
   bool rotEncClk;
+
+  unsigned long t0 = millis();
+  unsigned long t1;
+  unsigned long lastUpdate;
+  float gameSpeed = 1.0;
 //---- END OF DATA STRUCTURES ----//
 
 Adafruit_SSD1306 OLED(OLEDWIDTH, OLEDHEIGHT);
@@ -69,8 +88,12 @@ EmulatorState gameSelect = snake;
 GameStates game1 = unactivated;
 GameStates game2 = unactivated;
 GameStates game3 = unactivated;
+OLEDPixel snakeFruit;
 
 void setup() {
+  // random seed of unconnected analog input as recommended by Arduino documentation
+  randomSeed(analogRead(A2));
+
   // lcd init
   lcd.begin(LCDCOLUMNS, LCDROWS);
   lcd.noCursor();
@@ -83,6 +106,8 @@ void setup() {
 
   rotEncState = GetRotaryState(ROTARYENCPINA, ROTARYENCPINB);
   rotEncClk = digitalRead(ROTARYENCCLK);
+  t1 = millis();
+  lastUpdate = 0;
 }
 
 void loop() {
@@ -94,6 +119,7 @@ void loop() {
       switch (rotEncInput) {
         // Game is selected
         case (clk):
+          
         break;
 
         case (none):
@@ -103,6 +129,7 @@ void loop() {
         default:
           // EmulatorStates game states start at 1 and not 0 -> decrement 1 before modulus and increment 1 after 
           gameSelect = EmulatorState( ((int(gameSelect) -1 + int(rotEncInput)) % 3) + 1 );
+          LCDSelectGame(gameSelect);
         break;
       }
     break;
@@ -112,7 +139,7 @@ void loop() {
         // boot game
         case (unactivated):
           game1 = activated;
-          LCDRunGame(snake);
+          BootGame(snake);
         break;
 
         // Menu Selection
@@ -122,10 +149,18 @@ void loop() {
 
         // game loop
         case (playing):
+          OLEDPixel dir;
+          // get direction of snake
+          // check upcoming state, set game1 to failure if game over, increment score if needed (and pick next fruit);
+          // return
+          if (game1 != failure) {
+            SnakeNextFrame(dir);
+          }
         break;
 
         // game over
         case (failure):
+          // remove linked list
         break;
 
         default:
@@ -137,9 +172,8 @@ void loop() {
       switch (game2) {
         // boot game
         case (unactivated):
-          
           game2 = activated;
-          LCDRunGame(pong);
+          BootGame(pong);
         break;
 
         // Menu Selection
@@ -164,9 +198,8 @@ void loop() {
       switch (game3) {
         // boot game
         case (unactivated):
-          
           game3 = activated;
-          LCDRunGame(tron);
+          BootGame(tron);
         break;
 
         // Menu Selection
@@ -190,14 +223,42 @@ void loop() {
     default:
     break;
   }
-
+  t0 = t1;
+  t1 = millis();
 }
 
-// LCDText object constructor with String and LCDAlignment inputs to set initial vars
-LCDText::LCDText(String t, LCDAlignment a) { //, int r) {
-  text = t;
-  align = a;
-  // row = r
+// ---- CONSTRUCTORS ---- //
+  LCDText::LCDText(String text, LCDAlignment align) { //, int row) {
+    this->text = text;
+    this->align = align;
+    // this->row = row
+  }
+
+  OLEDPixel::OLEDPixel(int16_t x, int16_t y) { //, int16_t color) {
+    this->x = x;
+    this->y = y;
+    //this->color = color;
+  }
+
+  SnakeNode::SnakeNode(OLEDPixel pos, OLEDPixel dir) {
+    this->pos = pos;
+    this->dir = dir;
+  }
+// ---- END OF CONSTRUCTORS ---- //
+
+void LCDSelectGame(EmulatorState game) {
+  LCDPrint(lcd, LCDText("Selected Game:", center), LCDText(EmuStateToString(game), center));
+}
+
+void BootGame(EmulatorState game) {
+  LCDPrint(lcd, LCDText("Running:", center), LCDText(EmuStateToString(game), center));
+
+  lastUpdate = 0;
+
+  // TODO - Draw logo? lol
+
+  DrawGameMenu(game);
+
 }
 
 void DrawGameMenu(EmulatorState game) {
@@ -218,30 +279,17 @@ void DrawGameMenu(EmulatorState game) {
   OLED.setTextSize(2);
   
   // TODO - Draw PLAY & QUIT OPTIONS
+  // FEATURE - Add Scoreboard?
 
 }
 
-String EmuStateToString (EmulatorState state) {
-  switch (state) {
-    case (snake):
-    return "Snake";
-    case (pong):
-    return "Pong";
-    case (tron):
-    return "Tron";
-    case (doom):
-    return "Doom";
-  }
+void GameMenuSelect() {
+
 }
 
-void LCDGameSelect(EmulatorState game) {
-  LCDPrint(lcd, LCDText("Selected Game:", center), LCDText(EmuStateToString(game), center));
-}
+// Pass pixel info to DrawNextFrame
+void SnakeNextFrame(OLEDPixel dir) {
 
-void LCDRunGame(EmulatorState game) {
-  LCDPrint(lcd, LCDText("Running:", center));
-
-  DrawGameMenu(game);
 }
 
 // Polls the Rotary Encoder for changes in position or presses
@@ -256,6 +304,27 @@ RotaryEncoder PollRotaryEnc() {
   if ( (rotEncClk != digitalRead(ROTARYENCCLK)) && (rotEncClk == HIGH) ) {
     rotEncClk = digitalRead(ROTARYENCCLK);
     return clk;
+  }
+}
+
+// ---- UTILITY FUNCTIONS ---- //
+
+// Returns time in milliseconds since last frame
+unsigned long MillisToFrameTime(unsigned long time0, unsigned long time1) { return (time1-time0); }
+
+// Converts the EmulatorState enum to a capitalized String
+String EmuStateToString (EmulatorState state) {
+  switch (state) {
+    case (snake):
+    return "Snake";
+    case (pong):
+    return "Pong";
+    case (tron):
+    return "Tron";
+    case (doom):
+    return "Doom";
+    default:
+    return "Selection";
   }
 }
 
@@ -290,15 +359,36 @@ int8_t GetRotaryKnobDir(uint8_t *oldState, const uint8_t PinA, const uint8_t Pin
   return knobDir;
 }
 
+// Draws the next frame of a monochrome Adafruit SSD1306 OLED display
+// - Takes the input of the Adafruit_SSD1306 object, an integer number of
+// - pixels to be drawn, and variable number of OLEDPixel objects (max of 65535)
+void DrawNextFrame(Adafruit_SSD1306 display, uint16_t pNum, OLEDPixel pixel, ...) {
+  va_list list;
+  va_start(list, pixel);
+
+  for (uint16_t i = 0; i < pNum; i++) {
+    OLEDPixel p = va_arg(list, OLEDPixel);
+    // draw pixels into buffer
+    display.drawPixel(p.x, p.y, 1);
+  }
+
+  va_end(list);
+  // display pixels in buffer
+  display.display();
+}
+
 // Prints Strings to an input LCD display and adjusts the text positioning based on an input LCDText data structure
 // - Text that is longer than the column number will be cut off (limited to a max of 128 columns)
 // - Any args provided that surpass the row number will not be used (limited to a max of 128 rows)
-void LCDPrint(LiquidCrystal LCD, LCDText t, ...) {
+// - Providing less args than are columns will result in undefined behaviour 
+void LCDPrint(LiquidCrystal LCD, LCDText text, ...) {
   // prepare list of all args
   va_list list;
-  va_start(list, t);
+  va_start(list, text);
 
   for (uint8_t i = 0; i < LCDROWS; i++) {
+    // fetchs current and moves to next LCDText object
+    LCDText t = va_arg(list, LCDText);
 
     // set text indent based on input alignment - if length is greater than columns, set to 0
     uint8_t indent = (LCDCOLUMNS < t.text.length()) ? 0 : (LCDCOLUMNS - t.text.length()) ; 
@@ -324,8 +414,6 @@ void LCDPrint(LiquidCrystal LCD, LCDText t, ...) {
     LCD.setCursor(indent,i);
     LCD.print(t.text.c_str());
 
-    // to next LCDText object
-    va_arg(list, LCDText);
   }
 
   va_end(list);
