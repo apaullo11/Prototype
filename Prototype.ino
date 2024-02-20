@@ -5,6 +5,8 @@
   #include <splash.h>
   #include <LiquidCrystal.h>
 
+  #include "LinkedList.h"
+
   // BITMAPS
   //#include "Bitmaps/SnakeMenuPlay.h"
   //#include "Bitmaps/SnakeMenuQuit.h"
@@ -56,17 +58,10 @@
     // int row = 0
   };
 
-  struct OLEDPixel {
-    OLEDPixel() {};
-    OLEDPixel(int16_t x, int16_t y); //, int16_t color);
-    //
+  struct vec2 {
+    vec2();
+    vec2(int16_t x, int16_t y); //, int16_t color);
     int16_t x, y;
-  };
-
-  struct SnakeNode {
-    SnakeNode(OLEDPixel pos, OLEDPixel dir);
-    OLEDPixel pos;
-    OLEDPixel dir;
   };
 
   int rotEncPos = 0;
@@ -88,7 +83,8 @@ EmulatorState gameSelect = snake;
 GameStates game1 = unactivated;
 GameStates game2 = unactivated;
 GameStates game3 = unactivated;
-OLEDPixel snakeFruit;
+LinkedList *SnakeGame;
+vec2 snakeFruit;
 
 void setup() {
   // random seed of unconnected analog input as recommended by Arduino documentation
@@ -144,12 +140,15 @@ void loop() {
 
         // Menu Selection
         case (activated):
-        
+
+          // if play, run game initalizer
+          if (true) StartSnake();
+          else if (false) QuitGame();
         break;
 
         // game loop
         case (playing):
-          OLEDPixel dir;
+          vec2 dir;
           // get direction of snake
           // check upcoming state, set game1 to failure if game over, increment score if needed (and pick next fruit);
           // return
@@ -234,16 +233,18 @@ void loop() {
     // this->row = row
   }
 
-  OLEDPixel::OLEDPixel(int16_t x, int16_t y) { //, int16_t color) {
+  vec2::vec2() { //, int16_t color) {
+    this->x = 0;
+    this->y = 0;
+    //this->color = color;
+  }
+
+  vec2::vec2(int16_t x, int16_t y) { //, int16_t color) {
     this->x = x;
     this->y = y;
     //this->color = color;
   }
 
-  SnakeNode::SnakeNode(OLEDPixel pos, OLEDPixel dir) {
-    this->pos = pos;
-    this->dir = dir;
-  }
 // ---- END OF CONSTRUCTORS ---- //
 
 void LCDSelectGame(EmulatorState game) {
@@ -252,8 +253,6 @@ void LCDSelectGame(EmulatorState game) {
 
 void BootGame(EmulatorState game) {
   LCDPrint(lcd, LCDText("Running:", center), LCDText(EmuStateToString(game), center));
-
-  lastUpdate = 0;
 
   // TODO - Draw logo? lol
 
@@ -284,11 +283,22 @@ void DrawGameMenu(EmulatorState game) {
 }
 
 void GameMenuSelect() {
+  unsigned int joyX, joyY;
+}
+
+void QuitGame() {
+  // TODO
+}
+
+void StartSnake() {
+  lastUpdate = 0;
+  SnakeGame = new LinkedList(4);
+
 
 }
 
 // Pass pixel info to DrawNextFrame
-void SnakeNextFrame(OLEDPixel dir) {
+void SnakeNextFrame(vec2 dir) {
 
 }
 
@@ -361,13 +371,13 @@ int8_t GetRotaryKnobDir(uint8_t *oldState, const uint8_t PinA, const uint8_t Pin
 
 // Draws the next frame of a monochrome Adafruit SSD1306 OLED display
 // - Takes the input of the Adafruit_SSD1306 object, an integer number of
-// - pixels to be drawn, and variable number of OLEDPixel objects (max of 65535)
-void DrawNextFrame(Adafruit_SSD1306 display, uint16_t pNum, OLEDPixel pixel, ...) {
+// - pixels to be drawn, and variable number of vec2 objects (max of 65535)
+void DrawNextFrame(Adafruit_SSD1306 display, uint16_t pNum, vec2 pixel, ...) {
   va_list list;
   va_start(list, pixel);
 
   for (uint16_t i = 0; i < pNum; i++) {
-    OLEDPixel p = va_arg(list, OLEDPixel);
+    vec2 p = va_arg(list, vec2);
     // draw pixels into buffer
     display.drawPixel(p.x, p.y, 1);
   }
