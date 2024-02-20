@@ -1,5 +1,3 @@
-#include <cstdint>
-
 template <typename T>
 class LinkedList {
   LinkedList();
