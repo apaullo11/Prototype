@@ -1,25 +1,30 @@
-#include <cstdint>
+#include <stdint.h>
+
+struct vec2;
+
+struct Node {
+  Node();
+  Node(Node *next, Node *prev);
+  Node *next, *prev;
+  vec2 *pos;
+  vec2 *dir;
+};
 
 class LinkedList {
-  LinkedList();
-  LinkedList(unsigned int size);
   unsigned int size = 0;
   Node *head, *tail;
   
   public:
+  LinkedList();
+  LinkedList(unsigned int size);
   void removeNode(unsigned int index);
   void addNode(unsigned int index);
   void addFrontNode();
   void addBackNode();
   void removeFrontNode();
   void removeBackNode();
+  void destroyList();
   void destroyList(uint8_t dir);
-};
-
-struct Node {
-  Node();
-  Node(Node *next, Node *prev);
-  Node *next, *prev;
 };
 
 LinkedList::LinkedList() {
@@ -94,6 +99,10 @@ void LinkedList::removeBackNode() {
   this->tail->prev = nullptr;  
   // Remove old head
   delete oldTail;
+}
+
+void LinkedList::destroyList() {
+  destroyList(-1);
 }
 
 void LinkedList::destroyList(uint8_t dir) {
