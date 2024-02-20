@@ -80,6 +80,7 @@ GameStates game2 = unactivated;
 GameStates game3 = unactivated;
 LinkedList *SnakeGame;
 vec2 snakeFruit;
+unsigned int score;
 
 void setup() {
   // random seed of unconnected analog input as recommended by Arduino documentation
@@ -288,9 +289,26 @@ void StartSnake() {
 
 }
 
+bool isSnakeDirValid(vec2 dir) {
+  vec2 nextPos = add(*(SnakeGame->head->pos), dir);
+  if ( !OLEDGetPixel(OLED, nextPos) ) {
+    return true;
+  } else if ( (nextPos.x == snakeFruit.x) && (nextPos.y == snakeFruit.y) ) {
+    score++;
+    return true;
+  } else return false;
+
+}
+
 // Pass pixel info to DrawNextFrame
 void SnakeNextFrame(vec2 dir) {
-  
+  // calculate when next frame
+  // is it time for next frame?
+  if (false) return;
+
+  //DrawNextFrame(OLED);
+
+  lastUpdate = 0;
 }
 
 // Polls the Rotary Encoder for changes in position or presses
@@ -314,6 +332,10 @@ vec2 GetJoystickAxes(const uint8_t PinA, const uint8_t PinB) {
   uint16_t joyX = analogRead(PinA);
   uint16_t joyY = analogRead(PinB);
   return vec2(joyX,joyY);
+}
+
+bool OLEDGetPixel(Adafruit_SSD1306 display, vec2 v) {
+  return display.getPixel(v.x, v.y);
 }
 
 // Returns time in milliseconds since last frame
