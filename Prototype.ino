@@ -58,11 +58,6 @@
     // int row = 0
   };
 
-  struct vec2 {
-    vec2();
-    vec2(int16_t x, int16_t y); //, int16_t color);
-    int16_t x, y;
-  };
 
   int rotEncPos = 0;
   int8_t rotEncDir = 0;
@@ -233,18 +228,6 @@ void loop() {
     // this->row = row
   }
 
-  vec2::vec2() { //, int16_t color) {
-    this->x = 0;
-    this->y = 0;
-    //this->color = color;
-  }
-
-  vec2::vec2(int16_t x, int16_t y) { //, int16_t color) {
-    this->x = x;
-    this->y = y;
-    //this->color = color;
-  }
-
 // ---- END OF CONSTRUCTORS ---- //
 
 void LCDSelectGame(EmulatorState game) {
@@ -283,23 +266,31 @@ void DrawGameMenu(EmulatorState game) {
 }
 
 void GameMenuSelect() {
-  unsigned int joyX, joyY;
+  vec2 axisVals = GetJoystickAxes(JOYSTICKXPIN,JOYSTICKYPIN);
+
 }
 
 void QuitGame() {
   // TODO
 }
 
+void NewSnakeNode(LinkedList *s, vec2 *pos, vec2 *dir) {
+  s->addTailNode();
+  s->tail->pos = pos;
+  s->tail->dir = dir;
+}
+
 void StartSnake() {
   lastUpdate = 0;
-  SnakeGame = new LinkedList(4);
-
+  for (uint8_t i = 0; i<4; i++) {
+    NewSnakeNode(SnakeGame, new vec2(OLEDWIDTH/2,(OLEDHEIGHT/2)+i), new vec2(0,-1));
+  }
 
 }
 
 // Pass pixel info to DrawNextFrame
 void SnakeNextFrame(vec2 dir) {
-
+  
 }
 
 // Polls the Rotary Encoder for changes in position or presses
@@ -318,6 +309,12 @@ RotaryEncoder PollRotaryEnc() {
 }
 
 // ---- UTILITY FUNCTIONS ---- //
+
+vec2 GetJoystickAxes(const uint8_t PinA, const uint8_t PinB) {
+  uint16_t joyX = analogRead(PinA);
+  uint16_t joyY = analogRead(PinB);
+  return vec2(joyX,joyY);
+}
 
 // Returns time in milliseconds since last frame
 unsigned long MillisToFrameTime(unsigned long time0, unsigned long time1) { return (time1-time0); }

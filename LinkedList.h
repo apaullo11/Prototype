@@ -1,6 +1,12 @@
 #include <stdint.h>
 
-struct vec2;
+struct vec2 {
+  vec2();
+  vec2(int16_t x, int16_t y); //, int16_t color);
+  int16_t x, y;
+  add(vec2 v);
+  add(vec2 *v);
+};
 
 struct Node {
   Node();
@@ -10,22 +16,47 @@ struct Node {
   vec2 *dir;
 };
 
-class LinkedList {
+struct LinkedList {
   unsigned int size = 0;
   Node *head, *tail;
   
-  public:
   LinkedList();
   LinkedList(unsigned int size);
   void removeNode(unsigned int index);
   void addNode(unsigned int index);
-  void addFrontNode();
-  void addBackNode();
-  void removeFrontNode();
-  void removeBackNode();
+  void addHeadNode();
+  void addTailNode();
+  Node* removeHeadNode();
+  void destroyHeadNode();
+  Node* removeTailNode();
+  void destroyTailNode();
+  void moveBackToFront();
+  void moveBackToFront(vec2 *newDir);
   void destroyList();
   void destroyList(uint8_t dir);
 };
+
+vec2::vec2() { //, int16_t color) {
+  this->x = 0;
+  this->y = 0;
+  //this->color = color;
+}
+
+vec2::vec2(int16_t x, int16_t y) { //, int16_t color) {
+  this->x = x;
+  this->y = y;
+  //this->color = color;
+}
+
+Node::Node() {
+  this->next = nullptr;
+  this->prev = nullptr;
+}
+
+Node::Node(Node *next, Node *prev) {
+  this->next = next;
+  this->prev = prev;
+}
 
 LinkedList::LinkedList() {
   this->head = nullptr;
@@ -45,14 +76,28 @@ LinkedList::LinkedList(unsigned int size) {
     }
   }
   this->tail = tempTail;
+  this->size = size;
+}
+
+vec2 add(vec2 v1, vec2 v2) {
+  return vec2(v1.x+v2.x, v1.y+v2.y);
+}
+
+vec2::add(vec2 v) {
+  this->x = this->x + v.x;
+  this->y = this->y + v.y;
+}
+vec2::add(vec2 *v) {
+  this->x = this->x + v->x;
+  this->y = this->y + v->y;
 }
 
 /* TODO
 void LinkedList::addNode(unsigned int index) {
   if (index == 0) {
-    addFrontNode();
+    addHeadNode();
   } else if (index == this->size) {
-    addBackNode();
+    addTailNode();
   } else if (index > this->size) {
     for (unsigned int i = 0; i<index; i++) {
 
@@ -71,33 +116,63 @@ void LinkedList::addNode(unsigned int index) {
 }
 */
 
-void LinkedList::addFrontNode() {
-  this->head->next = new Node(nullptr, this->head);
-  this->head = this->head->next;
+void LinkedList::addHeadNode() {
+  if (this->size == 0) {
+    this->head = new Node(nullptr, nullptr);
+    this->tail = this->head;
+  } else {
+    this->head->next = new Node(nullptr, this->head);
+    this->head = this->head->next;
+  }
+  this->size++;
 }
 
-void LinkedList::addBackNode() {
-  this->tail->prev = new Node(this->tail, nullptr);
-  this->tail = this->tail->prev;
+void LinkedList::addTailNode() {
+  if (this->size == 0) {
+    this->tail = new Node(nullptr, nullptr);
+    this->head = this->tail;
+  } else {
+    this->tail->prev = new Node(this->tail, nullptr);
+    this->tail = this->tail->prev;
+  }
+  this->size++;
 }
 
-void LinkedList::removeFrontNode() {
+Node* LinkedList::removeHeadNode() {
   Node *oldHead = this->head;
   // Set new head
   this->head = oldHead->prev;
   // Remove next ptr on new head
   this->head->next = nullptr;  
-  // Remove old head
+  this->size--;
+
+  return oldHead;
+}
+
+void LinkedList::destroyHeadNode() {
+  Node *oldHead = removeHeadNode();
+  // Delete old head
+  delete oldHead->dir;
+  delete oldHead->pos;
   delete oldHead;
 }
 
-void LinkedList::removeBackNode() {
+Node* LinkedList::removeTailNode() {
   Node *oldTail = this->tail;
   // Set new tail
   this->tail = oldTail->next;
   // Remove prev ptr on new head
   this->tail->prev = nullptr;  
-  // Remove old head
+  this->size--;
+
+  return oldTail;
+}
+
+void LinkedList::destroyTailNode() {
+  Node *oldTail = removeTailNode();
+  // Delete old head
+  delete oldTail->dir;
+  delete oldTail->pos;
   delete oldTail;
 }
 
@@ -111,6 +186,8 @@ void LinkedList::destroyList(uint8_t dir) {
     n = this->tail;
     while (n != nullptr) {
       if (n->next == nullptr) {
+        delete n->dir;
+        delete n->pos;
         delete n;
         n = nullptr;
       } else {
@@ -122,6 +199,8 @@ void LinkedList::destroyList(uint8_t dir) {
     n = this->head;
     while (n != nullptr) {
       if (n->prev == nullptr) {
+        delete n->dir;
+        delete n->pos;
         delete n;
         n == nullptr;
       } else {
@@ -132,12 +211,19 @@ void LinkedList::destroyList(uint8_t dir) {
   }
 }
 
-Node::Node() {
-  this->next = nullptr;
-  this->prev = nullptr;
+// Move Node to front with same direction
+void LinkedList::moveBackToFront() {
+  Node *oldTail = removeTailNode();
+
+  oldTail->pos = this->head->pos;
+  oldTail->pos->add(this->head->dir);
+  oldTail->dir = this->head->dir;
 }
 
-Node::Node(Node *next, Node *prev) {
-  this->next = next;
-  this->prev = prev;
+// Move node to front with dif direction
+void LinkedList::moveBackToFront(vec2 *newDir) {
+  Node *oldTail = removeTailNode();
+
+  oldTail->pos->add(newDir);
+  oldTail->dir = newDir;
 }
