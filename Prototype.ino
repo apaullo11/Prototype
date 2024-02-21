@@ -59,8 +59,8 @@
   };
 
 
-  int rotEncPos = 0;
-  int8_t rotEncDir = 0;
+  int rotEncOldPos = 0;
+  int rotEncCurPos = 0;
   uint8_t rotEncState;
   bool rotEncClk;
 
@@ -73,11 +73,11 @@
 Adafruit_SSD1306 OLED(OLEDWIDTH, OLEDHEIGHT);
 LiquidCrystal lcd = LiquidCrystal(LCDRS, LCDENABLE, D4, D5, D6, D7);
 
-EmulatorState emu = selection;
-EmulatorState gameSelect = snake;
-GameStates game1 = unactivated;
-GameStates game2 = unactivated;
-GameStates game3 = unactivated;
+enum EmulatorState emu = selection;
+enum EmulatorState gameSelect = snake;
+enum GameStates game1 = unactivated;
+enum GameStates game2 = unactivated;
+enum GameStates game3 = unactivated;
 LinkedList *SnakeGame;
 vec2 snakeFruit;
 unsigned int score;
@@ -91,7 +91,20 @@ void setup() {
   lcd.noCursor();
   lcd.clear();
 
-  LCDPrint(lcd, LCDText("Left",left), LCDText("Right",right));
+  //LCDPrint(lcd, LCDText("Left",left), LCDText("Right",right));
+
+  // PIN MODES
+  pinMode(LCDRS, OUTPUT);
+  pinMode(LCDENABLE, OUTPUT);
+  pinMode(D4, OUTPUT);
+  pinMode(D5, OUTPUT);
+  pinMode(D6, OUTPUT);
+  pinMode(D7, OUTPUT);
+  pinMode(ROTARYENCPINA, OUTPUT);
+  pinMode(ROTARYENCPINB, OUTPUT);
+  pinMode(ROTARYENCCLK, OUTPUT);
+  pinMode(BUTTONPIN, OUTPUT);
+
 
   // prevent main loop from starting if state vars aren't initialized properly
   while (emu != selection || game1 != unactivated || game2 != unactivated || game3 != unactivated);
@@ -107,7 +120,7 @@ void loop() {
   switch (emu) {
     // game selection state
     case (selection):
-      RotaryEncoder rotEncInput = PollRotaryEnc();
+      enum RotaryEncoder rotEncInput = PollRotaryEnc();
       switch (rotEncInput) {
         // Game is selected
         case (clk):
@@ -120,7 +133,7 @@ void loop() {
         // Rotary Encoder turned cw or ccw
         default:
           // EmulatorStates game states start at 1 and not 0 -> decrement 1 before modulus and increment 1 after 
-          gameSelect = EmulatorState( ((int(gameSelect) -1 + int(rotEncInput)) % 3) + 1 );
+          gameSelect = EmulatorState( ((gameSelect -1 + rotEncInput) % 3) + 1 );
           LCDSelectGame(gameSelect);
         break;
       }
@@ -233,6 +246,7 @@ void loop() {
 
 void LCDSelectGame(EmulatorState game) {
   LCDPrint(lcd, LCDText("Selected Game:", center), LCDText(EmuStateToString(game), center));
+  
 }
 
 void BootGame(EmulatorState game) {
@@ -312,18 +326,23 @@ void SnakeNextFrame(vec2 dir) {
 }
 
 // Polls the Rotary Encoder for changes in position or presses
-// - Rotating takes precedent over clicking
+// - Rotating takes precedent over clicking (NVM CLICKING IS SUPER INCONSISTENT)
+// (ALL OF IT IS SUPER INCONSISTENT; IDK IF IT'S MY PART OR WHAT)
 RotaryEncoder PollRotaryEnc() {
-  rotEncDir += GetRotaryKnobDir(&rotEncState, ROTARYENCPINA, ROTARYENCPINB);
+  rotEncCurPos += GetRotaryKnobDir(&rotEncState, ROTARYENCPINA, ROTARYENCPINB);
+  int8_t dir = (rotEncOldPos - rotEncCurPos);
   // if at rest pos and the direction total is greater than a 4 state dif in one direction
-  if ( (rotEncState == 3) && ( abs(rotEncDir) >= 4) ) {
-    return RotaryEncoder(rotEncDir>>2);
+  if ( (rotEncState == 3) && ( abs(dir) >= 4) ) {
+    rotEncOldPos = rotEncCurPos;
+    return RotaryEncoder(dir>>2);
   }
-
+  /*
   if ( (rotEncClk != digitalRead(ROTARYENCCLK)) && (rotEncClk == HIGH) ) {
     rotEncClk = digitalRead(ROTARYENCCLK);
     return clk;
   }
+  */
+  return RotaryEncoder(0);
 }
 
 // ---- UTILITY FUNCTIONS ---- //
@@ -411,6 +430,7 @@ void DrawNextFrame(Adafruit_SSD1306 display, uint16_t pNum, vec2 pixel, ...) {
 // - Any args provided that surpass the row number will not be used (limited to a max of 128 rows)
 // - Providing less args than are columns will result in undefined behaviour 
 void LCDPrint(LiquidCrystal LCD, LCDText text, ...) {
+  LCD.clear();
   // prepare list of all args
   va_list list;
   va_start(list, text);
