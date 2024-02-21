@@ -7,9 +7,9 @@
 
   #include "LinkedList.h"
 
-  // BITMAPS
-  //#include "Bitmaps/SnakeMenuPlay.h"
-  //#include "Bitmaps/SnakeMenuQuit.h"
+  // BITMtextListS
+  //#include "BitmtextLists/SnakeMenuPlay.h"
+  //#include "BitmtextLists/SnakeMenuQuit.h"
 //---- END OF LIBRARIES AND INCLUDE FILES ----//
 
 // Screen Definitions
@@ -86,25 +86,24 @@ void setup() {
   // random seed of unconnected analog input as recommended by Arduino documentation
   randomSeed(analogRead(A2));
 
+  // PIN MODES
+  pinMode(LCDRS, INPUT);
+  pinMode(LCDENABLE, INPUT);
+  pinMode(D4, INPUT);
+  pinMode(D5, INPUT);
+  pinMode(D6, INPUT);
+  pinMode(D7, INPUT);
+  pinMode(ROTARYENCPINA, INPUT);
+  pinMode(ROTARYENCPINB, INPUT);
+  pinMode(ROTARYENCCLK, INPUT);
+  pinMode(BUTTONPIN, INPUT);
+
   // lcd init
   lcd.begin(LCDCOLUMNS, LCDROWS);
   lcd.noCursor();
   lcd.clear();
 
-  //LCDPrint(lcd, LCDText("Left",left), LCDText("Right",right));
-
-  // PIN MODES
-  pinMode(LCDRS, OUTPUT);
-  pinMode(LCDENABLE, OUTPUT);
-  pinMode(D4, OUTPUT);
-  pinMode(D5, OUTPUT);
-  pinMode(D6, OUTPUT);
-  pinMode(D7, OUTPUT);
-  pinMode(ROTARYENCPINA, OUTPUT);
-  pinMode(ROTARYENCPINB, OUTPUT);
-  pinMode(ROTARYENCCLK, OUTPUT);
-  pinMode(BUTTONPIN, OUTPUT);
-
+  Serial.begin(9600);
 
   // prevent main loop from starting if state vars aren't initialized properly
   while (emu != selection || game1 != unactivated || game2 != unactivated || game3 != unactivated);
@@ -113,9 +112,13 @@ void setup() {
   rotEncClk = digitalRead(ROTARYENCCLK);
   t1 = millis();
   lastUpdate = 0;
+
+  LCDSelectGame(gameSelect);
+  
 }
 
 void loop() {
+
   // main game states
   switch (emu) {
     // game selection state
@@ -128,12 +131,13 @@ void loop() {
         break;
 
         case (none):
+        //  LCDPrint(lcd,LCDText("Nothin", center),LCDText("lower", right));
         break;
 
         // Rotary Encoder turned cw or ccw
         default:
-          // EmulatorStates game states start at 1 and not 0 -> decrement 1 before modulus and increment 1 after 
-          gameSelect = EmulatorState( ((gameSelect -1 + rotEncInput) % 3) + 1 );
+          // EmulatorStates game states start at 1 and not 0 -> set to multiple of 3 before modulus and increment 1 after 
+          gameSelect = ((gameSelect + 2 + rotEncInput) % 3) + 1;
           LCDSelectGame(gameSelect);
         break;
       }
@@ -246,7 +250,6 @@ void loop() {
 
 void LCDSelectGame(EmulatorState game) {
   LCDPrint(lcd, LCDText("Selected Game:", center), LCDText(EmuStateToString(game), center));
-  
 }
 
 void BootGame(EmulatorState game) {
@@ -360,7 +363,7 @@ bool OLEDGetPixel(Adafruit_SSD1306 display, vec2 v) {
 // Returns time in milliseconds since last frame
 unsigned long MillisToFrameTime(unsigned long time0, unsigned long time1) { return (time1-time0); }
 
-// Converts the EmulatorState enum to a capitalized String
+// Converts the EmulatorState enum to a ctextListitalized String
 String EmuStateToString (EmulatorState state) {
   switch (state) {
     case (snake):
@@ -411,16 +414,16 @@ int8_t GetRotaryKnobDir(uint8_t *oldState, const uint8_t PinA, const uint8_t Pin
 // - Takes the input of the Adafruit_SSD1306 object, an integer number of
 // - pixels to be drawn, and variable number of vec2 objects (max of 65535)
 void DrawNextFrame(Adafruit_SSD1306 display, uint16_t pNum, vec2 pixel, ...) {
-  va_list list;
-  va_start(list, pixel);
+  va_list vecList;
+  va_start(vecList, pixel);
 
   for (uint16_t i = 0; i < pNum; i++) {
-    vec2 p = va_arg(list, vec2);
+    vec2 p = va_arg(vecList, vec2);
     // draw pixels into buffer
     display.drawPixel(p.x, p.y, 1);
   }
 
-  va_end(list);
+  va_end(vecList);
   // display pixels in buffer
   display.display();
 }
@@ -429,15 +432,15 @@ void DrawNextFrame(Adafruit_SSD1306 display, uint16_t pNum, vec2 pixel, ...) {
 // - Text that is longer than the column number will be cut off (limited to a max of 128 columns)
 // - Any args provided that surpass the row number will not be used (limited to a max of 128 rows)
 // - Providing less args than are columns will result in undefined behaviour 
-void LCDPrint(LiquidCrystal LCD, LCDText text, ...) {
+void LCDPrint(LiquidCrystal LCD, ...) {
   LCD.clear();
   // prepare list of all args
-  va_list list;
-  va_start(list, text);
+  va_list textList;
+  va_start(textList, LCD);
 
   for (uint8_t i = 0; i < LCDROWS; i++) {
     // fetchs current and moves to next LCDText object
-    LCDText t = va_arg(list, LCDText);
+    LCDText t = va_arg(textList, LCDText);
 
     // set text indent based on input alignment - if length is greater than columns, set to 0
     uint8_t indent = (LCDCOLUMNS < t.text.length()) ? 0 : (LCDCOLUMNS - t.text.length()) ; 
@@ -460,10 +463,11 @@ void LCDPrint(LiquidCrystal LCD, LCDText text, ...) {
         indent = 0;
         break;
     }
+    Serial.println(t.text);
     LCD.setCursor(indent,i);
     LCD.print(t.text.c_str());
 
   }
 
-  va_end(list);
+  va_end(textList);
 }
