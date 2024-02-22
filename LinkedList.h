@@ -1,39 +1,14 @@
 #include <stdint.h>
 
+//---- VEC2 DECLARATIONS ----//
 struct vec2 {
   vec2();
   vec2(int16_t x, int16_t y); //, int16_t color);
+  //~vec2();
   int16_t x, y;
   add(vec2 v);
   add(vec2 *v);
-};
-
-struct Node {
-  Node();
-  Node(Node *next, Node *prev);
-  Node *next, *prev;
-  vec2 *pos;
-  vec2 *dir;
-};
-
-struct LinkedList {
-  unsigned int size = 0;
-  Node *head, *tail;
-  
-  LinkedList();
-  LinkedList(unsigned int size);
-  void removeNode(unsigned int index);
-  void addNode(unsigned int index);
-  void addHeadNode();
-  void addTailNode();
-  Node* removeHeadNode();
-  void destroyHeadNode();
-  Node* removeTailNode();
-  void destroyTailNode();
-  void moveBackToFront();
-  void moveBackToFront(vec2 *newDir);
-  void destroyList();
-  void destroyList(uint8_t dir);
+  vec2 operator+(vec2 v);
 };
 
 vec2::vec2() { //, int16_t color) {
@@ -48,15 +23,81 @@ vec2::vec2(int16_t x, int16_t y) { //, int16_t color) {
   //this->color = color;
 }
 
+vec2 vec2::operator+(vec2 v) {
+  vec2 newV;
+  newV.x = this->x + v.x;
+  newV.y = this->y + v.y;
+  return newV;
+}
+
+vec2 add(vec2 v1, vec2 v2) {
+  return vec2(v1.x+v2.x, v1.y+v2.y);
+}
+
+vec2::add(vec2 v) {
+  this->x = this->x + v.x;
+  this->y = this->y + v.y;
+}
+vec2::add(vec2 *v) {
+  this->x = this->x + v->x;
+  this->y = this->y + v->y;
+}
+//---- END OF VEC2 DECLARATIONS ----//
+
+//---- NODE DECLARATIONS ----//
+struct Node {
+  Node();
+  Node(Node *next, Node *prev);
+  ~Node();
+  Node *next, *prev;
+  vec2 *pos;
+  vec2 *dir;
+};
+
 Node::Node() {
   this->next = nullptr;
   this->prev = nullptr;
+  this->pos = new vec2();
+  this->dir = new vec2();
 }
 
 Node::Node(Node *next, Node *prev) {
   this->next = next;
   this->prev = prev;
+  this->pos = new vec2();
+  this->dir = new vec2();
 }
+
+Node::~Node() {
+  delete pos;
+  delete dir;
+}
+//---- END OF NODE DECLARATIONS ----//
+
+//---- LINKEDLIST DECLARATIONS ----//
+struct LinkedList {
+  unsigned int size = 0;
+  Node *head, *tail;
+  
+  LinkedList();
+  LinkedList(unsigned int size);
+  ~LinkedList();
+  void removeNode(unsigned int index);
+  void addNode(unsigned int index);
+  Node* addHeadNode();
+  Node* addHeadNode(vec2 pos, vec2 dir);
+  Node* addTailNode();
+  Node* addTailNode(vec2 pos, vec2 dir);
+  Node* removeHeadNode();
+  void destroyHeadNode();
+  Node* removeTailNode();
+  void destroyTailNode();
+  void moveBackToFront();
+  void moveBackToFront(vec2 *newDir);
+  void destroyList();
+  void destroyList(uint8_t dir);
+};
+
 
 LinkedList::LinkedList() {
   this->head = nullptr;
@@ -79,17 +120,8 @@ LinkedList::LinkedList(unsigned int size) {
   this->size = size;
 }
 
-vec2 add(vec2 v1, vec2 v2) {
-  return vec2(v1.x+v2.x, v1.y+v2.y);
-}
+LinkedList::~LinkedList() {
 
-vec2::add(vec2 v) {
-  this->x = this->x + v.x;
-  this->y = this->y + v.y;
-}
-vec2::add(vec2 *v) {
-  this->x = this->x + v->x;
-  this->y = this->y + v->y;
 }
 
 /* TODO
@@ -116,7 +148,7 @@ void LinkedList::addNode(unsigned int index) {
 }
 */
 
-void LinkedList::addHeadNode() {
+Node* LinkedList::addHeadNode() {
   if (this->size == 0) {
     this->head = new Node(nullptr, nullptr);
     this->tail = this->head;
@@ -125,9 +157,17 @@ void LinkedList::addHeadNode() {
     this->head = this->head->next;
   }
   this->size++;
+  return this->head;
 }
 
-void LinkedList::addTailNode() {
+Node* LinkedList::addHeadNode(vec2 pos, vec2 dir) {
+  addHeadNode();
+  *(this->head->pos) = pos;
+  *(this->head->dir) = dir;
+  return this->head;
+}
+
+Node* LinkedList::addTailNode() {
   if (this->size == 0) {
     this->tail = new Node(nullptr, nullptr);
     this->head = this->tail;
@@ -136,6 +176,14 @@ void LinkedList::addTailNode() {
     this->tail = this->tail->prev;
   }
   this->size++;
+  return this->tail;
+}
+
+Node* LinkedList::addTailNode(vec2 pos, vec2 dir) {
+  addTailNode();
+  *(this->tail->pos) = pos;
+  *(this->tail->dir) = dir;
+  return this->tail;
 }
 
 Node* LinkedList::removeHeadNode() {
@@ -152,8 +200,6 @@ Node* LinkedList::removeHeadNode() {
 void LinkedList::destroyHeadNode() {
   Node *oldHead = removeHeadNode();
   // Delete old head
-  delete oldHead->dir;
-  delete oldHead->pos;
   delete oldHead;
 }
 
@@ -171,8 +217,6 @@ Node* LinkedList::removeTailNode() {
 void LinkedList::destroyTailNode() {
   Node *oldTail = removeTailNode();
   // Delete old head
-  delete oldTail->dir;
-  delete oldTail->pos;
   delete oldTail;
 }
 
