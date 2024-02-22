@@ -3,7 +3,7 @@
   // Libraries
   #include <Adafruit_SSD1306.h>
   #include <splash.h>
-  #include <LiquidCrystal_74HC595.h>
+  #include <LiquidCrystal.h>
 
   #include "LinkedList.h"
 
@@ -34,7 +34,7 @@
   #define LCDDS                 11
   #define LCDSHCP               13
   #define LCDSTCP               12
-  #define RS                    1
+  #define RS                    11
   #define E                     3
   #define D4                    4
   #define D5                    5
@@ -56,7 +56,7 @@
   // ENUM DEFS
   enum LCDAlignment             { left, center, right };
   enum EmulatorState            { selection, snake, pong, tron, doom };
-  enum GameState               { unactivated, activated, playing, failure = -1 };
+  enum GameState                { unactivated, activated, playing, failure = -1 };
   enum RotaryEncoder            { ccw = -1, none, cw, clk };
 
   struct LCDText {
@@ -83,7 +83,8 @@
 //---- END OF DATA STRUCTURES ----//
 
 Adafruit_SSD1306 OLED(OLEDWIDTH, OLEDHEIGHT);
-LiquidCrystal_74HC595 lcd(LCDDS, LCDSHCP, LCDSTCP, RS, E, D4, D5, D6, D7);
+LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
+//Adafruit_LiquidCrystal lcd(0);
 
 enum EmulatorState emu = selection;
 enum EmulatorState gameSelect = snake;
@@ -107,13 +108,30 @@ void setup() {
   pinMode(ROTARYENCPINB, INPUT);
   pinMode(BUTTONPIN, INPUT);
 
+  Serial.begin(9600);
+
   // lcd init
   lcd.begin(LCDCOLUMNS, LCDROWS);
   lcd.noCursor();
   lcd.clear();
 
-  Serial.begin(9600);
+  
+  // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
+  if(!OLED.begin(SSD1306_SWITCHCAPVCC, 0x3D)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;); // Don't proceed, loop forever
+  }
+  
+  // Show initial display buffer contents on the screen --
+  // the library initializes this with an Adafruit splash screen.
+  OLED.display();
+  delay(2000); // Pause for 2 seconds
 
+  // Clear the buffer
+  OLED.clearDisplay();
+  OLED.display();
+  
+  
   // prevent main loop from starting if state vars aren't initialized properly
   while (emu != selection || game1 != unactivated || game2 != unactivated || game3 != unactivated);
 
@@ -123,132 +141,144 @@ void setup() {
   lastUpdate = 0;
 
   LCDSelectGame(gameSelect);
-  
 }
 
 void loop() {
   // main game states
-  switch (emu) {
+  if (emu == selection) {
     // game selection state
-    case (selection):
-      // get rotary encoder rotation
-      enum RotaryEncoder rotEncInput = PollRotaryEnc();
-      // unless button is pressed to select game
-      // if button is down, AKA 1(TRUE) - set rotEncInput to 2, AKA clk
-      rotEncInput = ( isButtonPressed(BUTTONPIN)<<1 );
-      switch (rotEncInput) {
-        // Game is selected
-        case (clk):
-          emu = gameSelect;
-        break;
+    //Serial.println(String(emu));
+    // get rotary encoder rotation
+    enum RotaryEncoder rotEncInput = PollRotaryEnc();
+    // unless button is pressed to select game
+    // if button is down, AKA 1(TRUE) - set rotEncInput to 2, AKA clk
+    //Serial.println(String(digitalRead(BUTTONPIN)));
+    if (isButtonPressed(&buttonClk, BUTTONPIN)) rotEncInput = clk;
+    switch (rotEncInput) {
+      // Game is selected
+      case (clk):
+        emu = snake;
+        rotEncInput = none;
+        Serial.println("Game Selected");
+      break;
 
-        case (none):
-        break;
+      case (none):
+      break;
 
-        // Rotary Encoder turned cw or ccw
-        default:
-          // EmulatorStates game states start at 1 and not 0 -> set to multiple of 3 before modulus and increment 1 after 
-          gameSelect = ((gameSelect + 2 + rotEncInput) % 3) + 1;
-          LCDSelectGame(gameSelect);
-        break;
-      }
-    break;
+      // Rotary Encoder turned cw or ccw
+      default:
+        // EmulatorStates game states start at 1 and not 0 -> set to multiple of 3 before modulus and increment 1 after 
+        gameSelect = ((gameSelect + 2 + rotEncInput) % 3) + 1;
+        LCDSelectGame(gameSelect);
+      break;
+    }
+  }
 
-    case (snake):
-      switch (game1) {
-        // boot game
-        case (unactivated):
-          BootGame(emu);
-        break;
 
-        // Menu Selection
-        case (activated):
-          GameMenuSelect();
-          // if play, run game initalizer
-          if (isButtonPressed) {
-            if (isPlaySelected) StartSnake();
-            else QuitGame(&emu);
-          }
-        break;
+    
+  if (emu == snake) {
+    Serial.println("Emu is snake");
+    switch (game1) {
+      // boot game
+      case (unactivated):
+        BootGame(emu);
+      break;
 
-        // game loop
-        case (playing):
-          vec2 dir;
-          // get direction of snake
-          // check upcoming state, set game1 to failure if game over, increment score if needed (and pick next fruit);
-          // return
-          if (game1 != failure) {
-            SnakeNextFrame(dir);
-          }
-        break;
+      // Menu Selection
+      case (activated):
+        delay(200);
+        Serial.println("Game Playing Time!");
+        delay(200);
+        GameMenuSelect();
+        // if play, run game initalizer
+        if (isButtonPressed(&buttonClk, BUTTONPIN)) {
+          if (isPlaySelected) StartSnake();
+          else QuitGame(&emu);
+        }
+      break;
 
-        // game over
-        case (failure):
-          // remove linked list
-        break;
+      // game loop
+      case (playing):
+        vec2 dir;
+        // get direction of snake
+        // check upcoming state, set game1 to failure if game over, increment score if needed (and pick next fruit);
+        // return
+        if (game1 != failure) {
+          SnakeNextFrame(dir);
+        }
+      break;
 
-        default:
-        break;
-      }
-    break;
+      // game over
+      case (failure):
+        // remove linked list
+      break;
 
-    case (pong):
-      switch (game2) {
-        // boot game
-        case (unactivated):
-          game2 = activated;
-          BootGame(pong);
-        break;
+      default:
+        Serial.println("Game State invalid");
+      break;
+    }
+  }
 
-        // Menu Selection
-        case (activated):
-        
-        break;
 
-        // game loop
-        case (playing):
-        break;
 
-        // game over
-        case (failure):
-        break;
+  if (emu == pong) {
+    Serial.println("Emu is pong");
+    switch (game2) {
+      // boot game
+      case (unactivated):
+        game2 = activated;
+        BootGame(pong);
+      break;
 
-        default:
-        break;
-      }
-    break;
+      // Menu Selection
+      case (activated):
+      
+      break;
 
-    case (tron):
-      switch (game3) {
-        // boot game
-        case (unactivated):
-          game3 = activated;
-          BootGame(tron);
-        break;
+      // game loop
+      case (playing):
+      break;
 
-        // Menu Selection
-        case (activated):
-        
-        break;
+      // game over
+      case (failure):
+      break;
 
-        // game loop
-        case (playing):
-        break;
+      default:
+      break;
+    }
+  }
 
-        // game over
-        case (failure):
-        break;
 
-        default:
-        break;
-      }
-    break;
 
-    default:
-    break;
+  if (emu == tron) {
+    Serial.println("Emu is tron");
+    switch (game3) {
+      // boot game
+      case (unactivated):
+        game3 = activated;
+        BootGame(tron);
+      break;
+
+      // Menu Selection
+      case (activated):
+      
+      break;
+
+      // game loop
+      case (playing):
+      break;
+
+      // game over
+      case (failure):
+      break;
+
+      default:
+      break;
+    }
   }
   t0 = t1;
   t1 = millis();
+  //Serial.println(String(emu));
 }
 
 // ---- CONSTRUCTORS ---- //
@@ -266,13 +296,17 @@ void LCDSelectGame(EmulatorState game) {
 
 // Boots up the game that the input EmulatorState is currently set to
 void BootGame(EmulatorState game) {
+  Serial.println("Game Booting!");
+  GameState *gState = EmuStateToGameState(game);
   // sets the GameState of that selected game to activated
-  (*EmuStateToGameState(game)) = activated;
-
+  *(gState) = activated;
+  Serial.println("Activated!");
+  delay(100);
   LCDPrint(lcd, LCDText("Running:", center), LCDText(EmuStateToString(game), center));
 
   // TODO - Draw logo? lol
-
+  delay(200);
+  Serial.println("Drawing time");
   DrawGameMenu(game);
   
 }
@@ -308,6 +342,7 @@ void DrawGameMenu(EmulatorState game) {
   OLED.print("Quit");
   // FEATURE - Add Scoreboard?
   OLED.display();
+  Serial.println("Displaying!");
 }
 
 void GameMenuSelect() {
@@ -345,23 +380,18 @@ void QuitGame(EmulatorState *emuState) {
 }
 
 // Takes in an emulator state and returns a pointer to the respective GameState variable
-// - returns -1 
-GameState *EmuStateToGameState(EmulatorState emuState) {
-  switch (emuState) {
-    case (snake):
-      return &game1;
-    break;
-    case (pong):
-      return &game2;
-    break;
-    case (tron):
-      return &game3;
-    break;
-    case (doom):
-    break;
-    default:
-      return nullptr;
-    break;
+GameState* EmuStateToGameState(EmulatorState emuState) {
+  if (emuState == snake) {
+    return &game1;
+  } else if (emuState == pong) {
+    return &game2;
+  } else if (emuState == tron) {
+    return &game3;
+  } else if (emuState == doom) {
+    Serial.println("EmuState is DOOM");
+  } else {
+    Serial.println("EmuState is null");
+    return nullptr;
   }
 }
 
@@ -406,10 +436,12 @@ void SnakeNextFrame(vec2 dir) {
 // (ALL OF IT IS SUPER INCONSISTENT; IDK IF IT'S MY PART OR WHAT)
 RotaryEncoder PollRotaryEnc() {
   rotEncCurPos += GetRotaryKnobDir(&rotEncState, ROTARYENCPINA, ROTARYENCPINB);
+  //Serial.println(String(rotEncCurPos));
   int8_t dir = (rotEncOldPos - rotEncCurPos);
   // if at rest pos and the direction total is greater than a 4 state dif in one direction
   if ( (rotEncState == 3) && ( abs(dir) >= 4) ) {
     rotEncOldPos = rotEncCurPos;
+    //Serial.println(String(dir>>2));
     return RotaryEncoder(dir>>2);
   }
   /*
@@ -422,9 +454,27 @@ RotaryEncoder PollRotaryEnc() {
 }
 
 // ---- UTILITY FUNCTIONS ---- //
-
-bool isButtonPressed(uint8_t Pin) {
-  return (digitalRead(BUTTONPIN) == LOW);
+// 
+bool isButtonPressed(bool* buttonState, uint8_t buttonPin) {
+  uint8_t currentState = ((uint8_t)(*buttonState)<<1) | digitalRead(buttonPin);
+  // Button isn't pressed and state is false - return 0
+  if (currentState == 0) {
+  }
+  // Button is pressed, but state doesn't read it as so - return 1
+  if (currentState == 1) {
+    *buttonState = currentState;
+  }
+  // Button is not pressed, but state reads so - return 0
+  if (currentState == 2) {
+    *buttonState = 0;
+  }
+  // Button is pressed and state reads so - return 0
+  if (currentState == 3) {
+    return 0;
+  } else {
+    return (*buttonState);
+  }
+  
 }
 
 vec2 GetJoystickAxes(const uint8_t PinA, const uint8_t PinB) {
@@ -442,16 +492,15 @@ unsigned long MillisToFrameTime(unsigned long time0, unsigned long time1) { retu
 
 // Converts the EmulatorState enum to a ctextListitalized String
 String EmuStateToString (EmulatorState state) {
-  switch (state) {
-    case (snake):
+  if (state == snake) {
     return "Snake";
-    case (pong):
+  } else if (state == pong) {
     return "Pong";
-    case (tron):
+  } else if (state == tron) {
     return "Tron";
-    case (doom):
+  } else if (state = doom) {
     return "Doom";
-    default:
+  } else {
     return "Selection";
   }
 }
@@ -509,42 +558,29 @@ void DrawNextFrame(Adafruit_SSD1306 display, uint16_t pNum, vec2 pixel, ...) {
 // - Text that is longer than the column number will be cut off (limited to a max of 128 columns)
 // - Any args provided that surpass the row number will not be used (limited to a max of 128 rows)
 // - Providing less args than are columns will result in undefined behaviour 
-void LCDPrint(LiquidCrystal_74HC595 LCD, ...) {
+void LCDPrint(LiquidCrystal LCD, ...) {
   LCD.clear();
   // prepare list of all args
   va_list textList;
   va_start(textList, LCD);
-
+  
   for (uint8_t i = 0; i < LCDROWS; i++) {
     // fetchs current and moves to next LCDText object
     LCDText t = va_arg(textList, LCDText);
 
     // set text indent based on input alignment - if length is greater than columns, set to 0
     uint8_t indent = (LCDCOLUMNS < t.text.length()) ? 0 : (LCDCOLUMNS - t.text.length()) ; 
-    switch (t.align) {
+    if (t.align == left) {
       // no indent
-      case (left):
-        indent = 0;
-        break;
-
+      indent = 0;
+    } else if (t.align == center) {
       // half of column difference to center text
-      case (center):
-        indent = indent/2;
-        break;
-
-      // keep indent as column difference
-      case (right):
-        break;
-
-      default:
-        indent = 0;
-        break;
+      indent = indent/2;
     }
+    // keep indent as column difference otherwise
     Serial.println(t.text);
     LCD.setCursor(indent,i);
     LCD.print(t.text.c_str());
-
   }
-
   va_end(textList);
 }
