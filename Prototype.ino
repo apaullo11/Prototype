@@ -3,7 +3,7 @@
   // Libraries
   #include <Adafruit_SSD1306.h>
   #include <splash.h>
-  #include <LiquidCrystal.h>
+  #include <LiquidCrystal_74HC595.h>
 
   #include "LinkedList.h"
 
@@ -12,41 +12,52 @@
   //#include "BitmtextLists/SnakeMenuQuit.h"
 //---- END OF LIBRARIES AND INCLUDE FILES ----//
 
-// Screen Definitions
-#define LCDCOLUMNS            16
-#define LCDROWS               2
-#define OLEDWIDTH             128
-#define OLEDHEIGHT            64
-#define OLEDLETTERW           6
-#define OLEDLETTERH           8
-
+//---- SCREEN DEFINITIONS ----//
+  #define LCDCOLUMNS            16
+  #define LCDROWS               2
+  #define OLEDWIDTH             128
+  #define OLEDHEIGHT            64
+  #define OLEDLETTERW           6
+  #define OLEDLETTERH           8
+  // Play is centered roughly a fourth of the way across the screen, accounting for text size
+  const uint8_t playButtonX0 = (OLEDWIDTH / 4) - (2 * 2 * OLEDLETTERW);
+  const uint8_t playButtonX1 = (OLEDWIDTH / 4) + (2 * 2 * OLEDLETTERW);
+  // Quit is centered roughly three fourths of the way across the screen, accounting for text size
+  const uint8_t quitButtonX0 = (3 * OLEDWIDTH / 4) - (2 * 2 * OLEDLETTERW);
+  const uint8_t quitButtonX1 = (3 * OLEDWIDTH / 4) + (2 * 2 * OLEDLETTERW);
+  // Both Buttons are centered slightly above three fourths of the the way down the screen, accounting for text size
+  const uint8_t menuButtonY = (3 * OLEDHEIGHT / 4) - (OLEDLETTERH + OLEDHEIGHT/32);
+  const uint8_t menuSelectY = (3 * OLEDHEIGHT / 4) + (OLEDLETTERH);
+//---- END OF SCREEN DFINITIONS ----//
 //---- PIN DEFINITIONS ----//
-  // LCD Display
-  #define LCDRS               7
-  #define LCDENABLE           6
-  #define D4                  5
-  #define D5                  4
-  #define D6                  3
-  #define D7                  2
+  // LCD Display (ONLY 11-13 ARE USED DUE TO USING THE SHIFT REGISTER)
+  #define LCDDS                 11
+  #define LCDSHCP               13
+  #define LCDSTCP               12
+  #define RS                    1
+  #define E                     3
+  #define D4                    4
+  #define D5                    5
+  #define D6                    6
+  #define D7                    7
   // OLED Display (Definitions not used - just for reference)
-  #define SDA                 A4
-  #define SCL                 A5
+  #define SDA                   A4  // Data
+  #define SCL                   A5  // CLK
   // Interactive
-  #define JOYSTICKXPIN        A0
-  #define JOYSTICKYPIN        A1
-  #define JOYSTICKCLK         8
-  #define ROTARYENCPINA       9
-  #define ROTARYENCPINB       10
-  #define ROTARYENCCLK        11
-  #define BUTTONPIN           12
+  #define JOYSTICKXPIN          A0
+  #define JOYSTICKYPIN          A1
+  #define JOYSTICKCLK           7
+  #define ROTARYENCPINA         9   // DT
+  #define ROTARYENCPINB         10  // SW
+  #define BUTTONPIN             8
 //---- END OF PIN DEFINITIONS ----//
 
 //---- DATA STRUCTURING ----//
   // ENUM DEFS
-  enum LCDAlignment           { left, center, right };
-  enum EmulatorState          { selection, snake, pong, tron, doom };
-  enum GameStates             { unactivated, activated, playing, failure = -1 };
-  enum RotaryEncoder          { ccw = -1, none, cw, clk };
+  enum LCDAlignment             { left, center, right };
+  enum EmulatorState            { selection, snake, pong, tron, doom };
+  enum GameStates               { unactivated, activated, playing, failure = -1 };
+  enum RotaryEncoder            { ccw = -1, none, cw, clk };
 
   struct LCDText {
     LCDText(String t, LCDAlignment a);
@@ -62,16 +73,17 @@
   int rotEncOldPos = 0;
   int rotEncCurPos = 0;
   uint8_t rotEncState;
-  bool rotEncClk;
+  bool buttonClk;
 
   unsigned long t0 = millis();
   unsigned long t1;
   unsigned long lastUpdate;
   float gameSpeed = 1.0;
+  bool isPlaySelected = true;
 //---- END OF DATA STRUCTURES ----//
 
 Adafruit_SSD1306 OLED(OLEDWIDTH, OLEDHEIGHT);
-LiquidCrystal lcd = LiquidCrystal(LCDRS, LCDENABLE, D4, D5, D6, D7);
+LiquidCrystal_74HC595 lcd(LCDDS, LCDSHCP, LCDSTCP, RS, E, D4, D5, D6, D7);
 
 enum EmulatorState emu = selection;
 enum EmulatorState gameSelect = snake;
@@ -87,15 +99,12 @@ void setup() {
   randomSeed(analogRead(A2));
 
   // PIN MODES
-  pinMode(LCDRS, INPUT);
-  pinMode(LCDENABLE, INPUT);
-  pinMode(D4, INPUT);
-  pinMode(D5, INPUT);
-  pinMode(D6, INPUT);
-  pinMode(D7, INPUT);
+  pinMode(LCDDS, OUTPUT);
+  pinMode(LCDSHCP, OUTPUT);
+  pinMode(LCDSTCP, OUTPUT);
+
   pinMode(ROTARYENCPINA, INPUT);
   pinMode(ROTARYENCPINB, INPUT);
-  pinMode(ROTARYENCCLK, INPUT);
   pinMode(BUTTONPIN, INPUT);
 
   // lcd init
@@ -109,7 +118,7 @@ void setup() {
   while (emu != selection || game1 != unactivated || game2 != unactivated || game3 != unactivated);
 
   rotEncState = GetRotaryState(ROTARYENCPINA, ROTARYENCPINB);
-  rotEncClk = digitalRead(ROTARYENCCLK);
+  buttonClk = digitalRead(BUTTONPIN);
   t1 = millis();
   lastUpdate = 0;
 
@@ -118,20 +127,22 @@ void setup() {
 }
 
 void loop() {
-
   // main game states
   switch (emu) {
     // game selection state
     case (selection):
+      // get rotary encoder rotation
       enum RotaryEncoder rotEncInput = PollRotaryEnc();
+      // unless button is pressed to select game
+      // if button is down, AKA 1(TRUE) - set rotEncInput to 2, AKA clk
+      rotEncInput = ( isButtonPressed(BUTTONPIN)<<1 );
       switch (rotEncInput) {
         // Game is selected
         case (clk):
-          
+          emu = snake;
         break;
 
         case (none):
-        //  LCDPrint(lcd,LCDText("Nothin", center),LCDText("lower", right));
         break;
 
         // Rotary Encoder turned cw or ccw
@@ -153,7 +164,7 @@ void loop() {
 
         // Menu Selection
         case (activated):
-
+          GameMenuSelect();
           // if play, run game initalizer
           if (true) StartSnake();
           else if (false) QuitGame();
@@ -271,21 +282,52 @@ void DrawGameMenu(EmulatorState game) {
   // center game title text horizontally
   padding[0] = (OLEDWIDTH - (EmuStateToString(game).length() * 3 * OLEDLETTERW)) / 2;
   // have bottom line of text on middle horizontal
-  padding[1] = (OLEDHEIGHT / 2) - (EmuStateToString(game).length() * 3 * OLEDLETTERH);
+  padding[1] = (OLEDHEIGHT / 2) - (3 * OLEDLETTERH);
   
   OLED.setCursor(padding[0], padding[1]);
   OLED.print(EmuStateToString(game));
 
   OLED.setTextSize(2);
   
-  // TODO - Draw PLAY & QUIT OPTIONS
-  // FEATURE - Add Scoreboard?
+  // play button
+  padding[0] = playButtonX0;
+  padding[1] = menuButtonY;
+  OLED.setCursor(padding[0], padding[1]);
+  OLED.print("Play");
 
+  // quit button
+  padding[0] = quitButtonX0;
+  // y coord is the same
+  //padding[1] = (3 * OLEDHEIGHT / 4) - (OLEDLETTERH + OLEDHEIGHT/32);
+  OLED.setCursor(padding[0], padding[1]);
+  OLED.print("Quit");
+  // FEATURE - Add Scoreboard?
+  OLED.display();
 }
 
 void GameMenuSelect() {
   vec2 axisVals = GetJoystickAxes(JOYSTICKXPIN,JOYSTICKYPIN);
+  // play is selected
+  if (axisVals.x > (3*1023/5)) isPlaySelected = true;
+  // quit is selected
+  if (axisVals.x < (2*1023/5)) isPlaySelected = false;
+  DrawMenuLine(isPlaySelected);
+}
 
+// Draws line underneath the selected menu option
+// - if input doDrawPlay is true, it will draw a white line underneath play and a black line underneath quit; vice versa if false
+void DrawMenuLine(bool doDrawPlay) {
+  uint8_t x0, x1, y;
+  // play line
+  x0 = playButtonX0 - 3;
+  x1 = playButtonX1;
+  y = menuSelectY;
+  OLED.drawLine(x0, y, x1, y, doDrawPlay);
+  // quit line
+  x0 = quitButtonX0 - 3;
+  x1 = quitButtonX1;
+  OLED.drawLine(x0, y, x1, y, !doDrawPlay);
+  OLED.display();
 }
 
 void QuitGame() {
@@ -349,6 +391,10 @@ RotaryEncoder PollRotaryEnc() {
 }
 
 // ---- UTILITY FUNCTIONS ---- //
+
+bool isButtonPressed(uint8_t Pin) {
+  return (digitalRead(BUTTONPIN) == LOW);
+}
 
 vec2 GetJoystickAxes(const uint8_t PinA, const uint8_t PinB) {
   uint16_t joyX = analogRead(PinA);
@@ -432,7 +478,7 @@ void DrawNextFrame(Adafruit_SSD1306 display, uint16_t pNum, vec2 pixel, ...) {
 // - Text that is longer than the column number will be cut off (limited to a max of 128 columns)
 // - Any args provided that surpass the row number will not be used (limited to a max of 128 rows)
 // - Providing less args than are columns will result in undefined behaviour 
-void LCDPrint(LiquidCrystal LCD, ...) {
+void LCDPrint(LiquidCrystal_74HC595 LCD, ...) {
   LCD.clear();
   // prepare list of all args
   va_list textList;
