@@ -56,7 +56,7 @@
   // ENUM DEFS
   enum LCDAlignment             { left, center, right };
   enum EmulatorState            { selection, snake, pong, tron, doom };
-  enum GameStates               { unactivated, activated, playing, failure = -1 };
+  enum GameState               { unactivated, activated, playing, failure = -1 };
   enum RotaryEncoder            { ccw = -1, none, cw, clk };
 
   struct LCDText {
@@ -87,9 +87,9 @@ LiquidCrystal_74HC595 lcd(LCDDS, LCDSHCP, LCDSTCP, RS, E, D4, D5, D6, D7);
 
 enum EmulatorState emu = selection;
 enum EmulatorState gameSelect = snake;
-enum GameStates game1 = unactivated;
-enum GameStates game2 = unactivated;
-enum GameStates game3 = unactivated;
+enum GameState game1 = unactivated;
+enum GameState game2 = unactivated;
+enum GameState game3 = unactivated;
 LinkedList *SnakeGame;
 vec2 snakeFruit;
 unsigned int score;
@@ -139,7 +139,7 @@ void loop() {
       switch (rotEncInput) {
         // Game is selected
         case (clk):
-          emu = snake;
+          emu = gameSelect;
         break;
 
         case (none):
@@ -158,16 +158,17 @@ void loop() {
       switch (game1) {
         // boot game
         case (unactivated):
-          game1 = activated;
-          BootGame(snake);
+          BootGame(emu);
         break;
 
         // Menu Selection
         case (activated):
           GameMenuSelect();
           // if play, run game initalizer
-          if (true) StartSnake();
-          else if (false) QuitGame();
+          if (isButtonPressed) {
+            if (isPlaySelected) StartSnake();
+            else QuitGame(&emu);
+          }
         break;
 
         // game loop
@@ -263,13 +264,17 @@ void LCDSelectGame(EmulatorState game) {
   LCDPrint(lcd, LCDText("Selected Game:", center), LCDText(EmuStateToString(game), center));
 }
 
+// Boots up the game that the input EmulatorState is currently set to
 void BootGame(EmulatorState game) {
+  // sets the GameState of that selected game to activated
+  (*EmuStateToGameState(game)) = activated;
+
   LCDPrint(lcd, LCDText("Running:", center), LCDText(EmuStateToString(game), center));
 
   // TODO - Draw logo? lol
 
   DrawGameMenu(game);
-
+  
 }
 
 void DrawGameMenu(EmulatorState game) {
@@ -330,8 +335,34 @@ void DrawMenuLine(bool doDrawPlay) {
   OLED.display();
 }
 
-void QuitGame() {
-  // TODO
+// Quits the selected game given an input 
+// - sets the EmulatorState and GameState variables back to default states
+void QuitGame(EmulatorState *emuState) {
+  // Sets GameState variable to unactivated
+  (*EmuStateToGameState(*emuState)) = unactivated;
+  // resets given emulator state
+  *emuState = selection;
+}
+
+// Takes in an emulator state and returns a pointer to the respective GameState variable
+// - returns -1 
+GameState *EmuStateToGameState(EmulatorState emuState) {
+  switch (emuState) {
+    case (snake):
+      return &game1;
+    break;
+    case (pong):
+      return &game2;
+    break;
+    case (tron):
+      return &game3;
+    break;
+    case (doom):
+    break;
+    default:
+      return nullptr;
+    break;
+  }
 }
 
 void NewSnakeNode(LinkedList *s, vec2 *pos, vec2 *dir) {
