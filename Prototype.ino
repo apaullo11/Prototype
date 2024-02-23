@@ -5,6 +5,7 @@
   //#include <Adafruit_SSD1306_EMULATOR.h>
   #include <splash.h>
   //#include <LiquidCrystal.h>
+  #include <string.h>
 
   #include "LinkedList.h"
 
@@ -53,6 +54,9 @@
   #define ROTARYENCPINA         9   // DT
   #define ROTARYENCPINB         10  // SW
   #define BUTTONPIN             8
+  #define RGBPINR               3
+  #define RGBPING               5
+  #define RGBPINB               6
 //---- END OF PIN DEFINITIONS ----//
 
 //---- DATA STRUCTURING ----//
@@ -78,8 +82,8 @@
   uint8_t rotEncState;
   bool buttonClk;
 
-  unsigned long t0 = millis();
-  unsigned long t1;
+  //unsigned long t0 = millis();
+  //unsigned long t1;
   unsigned long lastUpdate;
   float gameSpeed = 1.0;
   bool isPlaySelected = true;
@@ -99,7 +103,7 @@ enum GameState game2 = unactivated;
 enum GameState game3 = unactivated;
 LinkedList *SnakeGame;
 vec2 snakeFruit;
-unsigned int score;
+//unsigned int score;
 
 void setup() {
   // random seed of unconnected analog input as recommended by Arduino documentation
@@ -142,11 +146,13 @@ void setup() {
 
   rotEncState = GetRotaryState(ROTARYENCPINA, ROTARYENCPINB);
   buttonClk = digitalRead(BUTTONPIN);
-  t1 = millis();
+  //t1 = millis();
   lastUpdate = 0;
 
   //LCDSelectGame(gameSelect);
+  DrawGameOptions();
   OLEDSelectGame(gameSelect);
+  RGBLED(RGBPINR, RGBPING, RGBPINB, 255, 0, 0);
 }
 
 void loop() {
@@ -163,9 +169,9 @@ void loop() {
     switch (rotEncInput) {
       // Game is selected
       case (clk):
-        emu = snake;
+        emu = gameSelect;
         rotEncInput = none;
-        Serial.println("Game Selected");
+        Serial.println(EmuStateToString(emu) + " Selected");
       break;
 
       case (none):
@@ -177,6 +183,11 @@ void loop() {
         gameSelect = ((gameSelect + 2 + rotEncInput) % 3) + 1;
         //LCDSelectGame(gameSelect);
         OLEDSelectGame(gameSelect);
+        int r = 0, g = 0, b = 0;
+        if (gameSelect == 1) r = 255;
+        if (gameSelect == 2) g = 255;
+        if (gameSelect == 3) b = 255;
+        RGBLED(RGBPINR, RGBPING, RGBPINB, r, g, b);
       break;
     }
   }
@@ -184,7 +195,7 @@ void loop() {
 
     
   if (emu == snake) {
-    Serial.println("Emu is snake");
+    //Serial.println("Emu is snake");
     switch (game1) {
       // boot game
       case (unactivated):
@@ -193,9 +204,9 @@ void loop() {
 
       // Menu Selection
       case (activated):
-        delay(200);
-        Serial.println("Game Playing Time!");
-        delay(200);
+        //delay(200);
+        //Serial.println("Game Playing Time!");
+        //delay(200);
         GameMenuSelect();
         // if play, run game initalizer
         if (isButtonPressed(&buttonClk, BUTTONPIN)) {
@@ -208,12 +219,13 @@ void loop() {
         case (playing):
           // get next direction of snake
           *(SnakeGame->head->dir) = GetJoystickDir(JOYSTICKXPIN, JOYSTICKYPIN);
-          // check if time for next frame 
-          if (true) {
-            if (isSnakeDirValid()) {
-              //SnakeNextFrame(dir);
+          // check if time for next frame
+          if (tick()) {
+            vec2 pos = SnakeNextPos();
+            if (isSnakeDirValid(pos)) {
+              SnakeNextFrame(pos);
             } else {
-              // GameOver();
+              GameOver();
             }
           }
         break;
@@ -286,8 +298,8 @@ void loop() {
       break;
     }
   }
-  t0 = t1;
-  t1 = millis();
+  //t0 = t1;
+  //t1 = millis();
   //Serial.println(String(emu));
 }
 
@@ -307,21 +319,39 @@ void LCDSelectGame(EmulatorState game) {
 }
 */
 void DrawGameOptions() {
+  Serial.println("Drawn");
   OLED.clearDisplay();
   OLED.setTextColor(1);
   OLED.setTextSize(2);
-  for (uint8_t i = 1; i<=3; i++) {
+  for (int i = 1; i<=3; i++) {
+    Serial.println(String(i));
     vec2 padding(0,0);
     padding.x = ( OLEDWIDTH - (2 * OLEDLETTERW * EmuStateToString(EmulatorState(i)).length()) ) / 2;
-    padding.y = ( (2*i - 1) * OLEDHEIGHT / 3) - (2 * OLEDLETTERH) );
-
+    padding.y = ( (2*i - 1) * OLEDHEIGHT / 6) - (OLEDLETTERH);
     OLED.setCursor(padding.x, padding.y);
     OLED.print(EmuStateToString(EmulatorState(i)));
   }
+  OLED.display();
 }
 
 void OLEDSelectGame(EmulatorState eState) {
+  OLED.setTextSize(2);
+  uint8_t x0, x1, y;
+  // arbitrary number of letters selected for the middle word
+  x0 = (( OLEDWIDTH - (2 * OLEDLETTERW * 8) ) / 2 );
+  x1 = ( OLEDWIDTH + (2 * OLEDLETTERW * 6) ) / 2;
+  for (uint8_t i = 1; i <= 3; i++) {
+    y = ( (2*i - 1) * OLEDHEIGHT / 6) - (OLEDLETTERH);
+    // if it is selected, the arrows are white - otherwise black/not visible
+    if (i == eState) { OLED.setTextColor(1); }
+    else OLED.setTextColor(0);
 
+    OLED.setCursor(x0, y);
+    OLED.write(0x10);
+    OLED.setCursor(x1, y);
+    OLED.write(0x11);
+  }
+  OLED.display();
 }
 
 // Boots up the game that the input EmulatorState is currently set to
@@ -330,13 +360,10 @@ void BootGame(EmulatorState game) {
   GameState *gState = EmuStateToGameState(game);
   // sets the GameState of that selected game to activated
   *(gState) = activated;
-  Serial.println("Activated!");
-  delay(100);
   //LCDPrint(lcd, LCDText("Running:", center), LCDText(EmuStateToString(game), center));
-
+  Serial.println(EmuStateToString(game));
   // TODO - Draw logo? lol
-  delay(200);
-  Serial.println("Drawing time");
+
   DrawGameMenu(game);
   
 }
@@ -354,7 +381,7 @@ void DrawGameMenu(EmulatorState game) {
   padding.y = (OLEDHEIGHT / 2) - (3 * OLEDLETTERH);
   
   OLED.setCursor(padding.x, padding.y);
-  OLED.print(EmuStateToString(game));
+  OLED.print(EmuStateToString(game).c_str());
 
   OLED.setTextSize(2);
   
@@ -376,7 +403,7 @@ void DrawGameMenu(EmulatorState game) {
 }
 
 void GameMenuSelect() {
-  vec2 axisDirs = GetJoystickDir(JOYSTICKXPIN,JOYSTICKYPIN);
+  vec2 axisDirs = GetJoystickAxes(JOYSTICKXPIN,JOYSTICKYPIN);
   // play is selected
   if (axisDirs.x > (3*1023/5)) isPlaySelected = true;
   // quit is selected
@@ -403,10 +430,15 @@ void DrawMenuLine(bool doDrawPlay) {
 // Quits the selected game given an input 
 // - sets the EmulatorState and GameState variables back to default states
 void QuitGame(EmulatorState *emuState) {
+  Serial.println("Quitting");
+  DrawGameOptions();
   // Sets GameState variable to unactivated
   (*EmuStateToGameState(*emuState)) = unactivated;
   // resets given emulator state
   *emuState = selection;
+}
+
+void GameOver() {
 }
 
 // Takes in an emulator state and returns a pointer to the respective GameState variable
@@ -430,42 +462,61 @@ void InitializeSnake() {
   lastUpdate = 0;
   for (uint8_t i = 0; i<4; i++) {
     // add nodes to snake
-    // Do I need to set the ptrs to point as something first?
     SnakeGame->addTailNode(vec2(OLEDWIDTH/2,(OLEDHEIGHT/2)-i), vec2(0,-1));
   } 
 
   snakeFruit.x = random(0+3,OLEDWIDTH-3);
   snakeFruit.y = random(0+3,OLEDHEIGHT-3);
+
+  OLED.fillRect(1, 1, 126, 62, 1);
+
+
+}
+
+vec2 SnakeNextPos() {
+  // direction of previous body node
+  vec2 bodyDir = *(SnakeGame->head->prev->pos) - *(SnakeGame->head->pos);
+  if (((*(SnakeGame->head->dir) + bodyDir).x == 0) && ((*(SnakeGame->head->dir) + bodyDir).y == 0)) return (bodyDir * -1);
+  else return ((*(SnakeGame->head->dir) + bodyDir) / 2);
 }
 
 //
-bool isSnakeDirValid() {
-  /*
-  vec2 dir = (SnakeGame->head->pos)
-  if ( !OLEDGetPixel(OLED, nextPos) ) {
-    return true;
-  } else if ( (nextPos.x == snakeFruit.x) && (nextPos.y == snakeFruit.y) ) {
-    score++;
-    return true;
-  } else return false;
-  */
+bool isSnakeDirValid(vec2 newPos) {
+  Node* snakeNode = SnakeGame->head->prev;
+  for (uint8_t i = 1; i < SnakeGame->size; i++) {
+    if (*(snakeNode->pos) == newPos) {
+      return false;
+    }
+    snakeNode = snakeNode->prev;
+  }
+  return true;
 }
 
-bool isTimeForNextFrame() {
 
+// Uses internal millisecond tracking to check if it is time for the next tick in game logic
+bool tick() {
+  unsigned int frameTime = 200 / gameSpeed;
+  if ((millis() - lastUpdate) >= frameTime) {
+    lastUpdate = millis();
+    return true;
+  }
 }
 
 // Compute logic for next frame; this function does these things:
-// - Change position and direction of nodes
-// - Increment scores and snake length
+// - Change positions of nodes
 // - Draws and erases pixels
-void SnakeNextFrame(vec2 dir) {
-  // calculate when next frame
-  // is it time for next frame?
+void SnakeNextFrame(vec2 pos) {
+  if (pos == snakeFruit) {
+    SnakeGame->addHeadNode(pos, *(SnakeGame->head->dir));
+    snakeFruit.x = random(0+3,OLEDWIDTH-3);
+    snakeFruit.y = random(0+3,OLEDHEIGHT-3);
+  } else {
+    DrawPixel(OLED, *(SnakeGame->tail->pos), 0);
+    SnakeGame->moveBackToFront();
+    DrawPixel(OLED, pos, 1);
+  }
 
-  //DrawNextFrame(OLED);
-
-  lastUpdate = 0;
+  OLED.display();
 }
 
 // Polls the Rotary Encoder for changes in position or presses
@@ -491,6 +542,18 @@ RotaryEncoder PollRotaryEnc() {
 }
 
 // ---- UTILITY FUNCTIONS ---- //
+
+void RGBLED(uint16_t RPin, uint16_t GPin, uint16_t BPin, uint16_t Rval, uint16_t Gval, uint16_t Bval) {
+  analogWrite(RPin,Rval);
+  analogWrite(GPin,Gval);
+  analogWrite(BPin,Bval);
+}
+
+
+// Draws pixel into the buffer given an OLED display, vec2 position, and color
+void DrawPixel(Adafruit_SSD1306 display, vec2 pos, uint16_t c) {
+  display.drawPixel(pos.x, pos.y, c);
+}
 
 bool isButtonPressed(bool* buttonState, uint8_t buttonPin) {
   uint8_t currentState = ((uint8_t)(*buttonState)<<1) | digitalRead(buttonPin);
@@ -539,7 +602,7 @@ bool OLEDGetPixel(Adafruit_SSD1306 display, vec2 v) {
 // Returns time in milliseconds since last frame
 unsigned long MillisToFrameTime(unsigned long time0, unsigned long time1) { return (time1-time0); }
 
-// Converts the EmulatorState enum to a ctextListitalized String
+// Converts the EmulatorState enum to a String
 String EmuStateToString (EmulatorState state) {
   if (state == snake) {
     return "Snake";
