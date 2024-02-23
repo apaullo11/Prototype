@@ -6,9 +6,13 @@ struct vec2 {
   vec2(int16_t x, int16_t y); //, int16_t color);
   //~vec2();
   int16_t x, y;
-  add(vec2 v);
-  add(vec2 *v);
-  vec2 operator+(vec2 v);
+  void add(vec2 v);
+  void add(vec2 *v);
+  inline vec2 operator+(vec2 v);
+  inline vec2 operator-(vec2 v);
+  inline vec2 operator*(int n);
+  inline vec2 operator/(int n);
+  inline bool operator==(vec2 v);
 };
 
 vec2::vec2() { //, int16_t color) {
@@ -30,20 +34,50 @@ vec2 vec2::operator+(vec2 v) {
   return newV;
 }
 
-vec2 add(vec2 v1, vec2 v2) {
-  return vec2(v1.x+v2.x, v1.y+v2.y);
+vec2 vec2::operator-(vec2 v) {
+  vec2 newV;
+  newV.x = this->x - v.x;
+  newV.y = this->y - v.y;
+  return newV;
 }
 
-vec2::add(vec2 v) {
+vec2 vec2::operator*(int n) {
+  vec2 newV;
+  newV.x = this->x * n;
+  newV.y = this->y * n;
+  return newV;
+}
+
+vec2 vec2::operator/(int n) {
+  vec2 newV;
+  newV.x = this->x / n;
+  newV.y = this->y / n;
+  return newV;
+}
+
+bool vec2::operator==(vec2 v) {
+  return ( (this->x == v.x) && (this->y == v.y) );
+}
+
+void vec2::add(vec2 v) {
   this->x = this->x + v.x;
   this->y = this->y + v.y;
 }
-vec2::add(vec2 *v) {
+
+void vec2::add(vec2 *v) {
   this->x = this->x + v->x;
   this->y = this->y + v->y;
 }
 //---- END OF VEC2 DECLARATIONS ----//
 
+vec2 add(vec2 v1, vec2 v2) {
+  return vec2(v1.x+v2.x, v1.y+v2.y);
+}
+/*
+vec2 abs(vec2 v) {
+  return vec2(abs(v.x), abs(v.y));
+}
+*/
 //---- NODE DECLARATIONS ----//
 struct Node {
   Node();
@@ -96,6 +130,8 @@ struct LinkedList {
   void moveBackToFront(vec2 *newDir);
   void destroyList();
   void destroyList(uint8_t dir);
+  Node* pop();
+  void push(Node* nodeptr);
 };
 
 
@@ -192,6 +228,7 @@ Node* LinkedList::removeHeadNode() {
   this->head = oldHead->prev;
   // Remove next ptr on new head
   this->head->next = nullptr;  
+  oldHead->prev = nullptr;
   this->size--;
 
   return oldHead;
@@ -208,7 +245,8 @@ Node* LinkedList::removeTailNode() {
   // Set new tail
   this->tail = oldTail->next;
   // Remove prev ptr on new head
-  this->tail->prev = nullptr;  
+  this->tail->prev = nullptr;
+  oldTail->next = nullptr;
   this->size--;
 
   return oldTail;
@@ -255,6 +293,18 @@ void LinkedList::destroyList(uint8_t dir) {
   }
 }
 
+Node* LinkedList::pop() {
+  // TODO
+}
+
+void LinkedList::push(Node* nodeptr) {
+  this->head->next = nodeptr;
+  nodeptr->prev = head;
+  this->head = nodeptr;
+  this->size++;
+}
+
+// maybe make a pop and push function for these?
 // Move Node to front with same direction
 void LinkedList::moveBackToFront() {
   Node *oldTail = removeTailNode();
@@ -262,12 +312,15 @@ void LinkedList::moveBackToFront() {
   oldTail->pos = this->head->pos;
   oldTail->pos->add(this->head->dir);
   oldTail->dir = this->head->dir;
-}
 
+  this->push(oldTail);
+}
 // Move node to front with dif direction
 void LinkedList::moveBackToFront(vec2 *newDir) {
   Node *oldTail = removeTailNode();
 
   oldTail->pos->add(newDir);
   oldTail->dir = newDir;
+  
+  this->push(oldTail);
 }
