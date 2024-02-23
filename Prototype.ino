@@ -88,6 +88,9 @@ LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
 
 enum EmulatorState emu = selection;
 enum EmulatorState gameSelect = snake;
+
+// I will make all these into a class for extensibility if I have the time
+// - AKA class with base components and make objects or child classes with gamemode specific features and functions
 enum GameState game1 = unactivated;
 enum GameState game2 = unactivated;
 enum GameState game3 = unactivated;
@@ -100,10 +103,9 @@ void setup() {
   randomSeed(analogRead(A2));
 
   // PIN MODES
-  pinMode(LCDDS, OUTPUT);
-  pinMode(LCDSHCP, OUTPUT);
-  pinMode(LCDSTCP, OUTPUT);
-
+  //pinMode(LCDDS, OUTPUT);
+  //pinMode(LCDSHCP, OUTPUT);
+  //pinMode(LCDSTCP, OUTPUT);
   pinMode(ROTARYENCPINA, INPUT);
   pinMode(ROTARYENCPINB, INPUT);
   pinMode(BUTTONPIN, INPUT);
@@ -192,21 +194,24 @@ void loop() {
         GameMenuSelect();
         // if play, run game initalizer
         if (isButtonPressed(&buttonClk, BUTTONPIN)) {
-          if (isPlaySelected) StartSnake();
+          if (isPlaySelected) InitializeSnake();
           else QuitGame(&emu);
         }
       break;
 
-      // game loop
-      case (playing):
-        vec2 dir;
-        // get direction of snake
-        // check upcoming state, set game1 to failure if game over, increment score if needed (and pick next fruit);
-        // return
-        if (game1 != failure) {
-          SnakeNextFrame(dir);
-        }
-      break;
+        // game loop
+        case (playing):
+          // get next direction of snake
+          *(SnakeGame->head->dir) = GetJoystickDir(JOYSTICKXPIN, JOYSTICKYPIN);
+          // check if time for next frame 
+          if (true) {
+            if (isSnakeDirValid()) {
+              //SnakeNextFrame(dir);
+            } else {
+              // GameOver();
+            }
+          }
+        break;
 
       // game over
       case (failure):
@@ -346,11 +351,11 @@ void DrawGameMenu(EmulatorState game) {
 }
 
 void GameMenuSelect() {
-  vec2 axisVals = GetJoystickAxes(JOYSTICKXPIN,JOYSTICKYPIN);
+  vec2 axisDirs = GetJoystickDir(JOYSTICKXPIN,JOYSTICKYPIN);
   // play is selected
-  if (axisVals.x > (3*1023/5)) isPlaySelected = true;
+  if (axisDirs.x > (3*1023/5)) isPlaySelected = true;
   // quit is selected
-  if (axisVals.x < (2*1023/5)) isPlaySelected = false;
+  if (axisDirs.x < (2*1023/5)) isPlaySelected = false;
   DrawMenuLine(isPlaySelected);
 }
 
@@ -395,36 +400,43 @@ GameState* EmuStateToGameState(EmulatorState emuState) {
   }
 }
 
-void NewSnakeNode(LinkedList *s, vec2 *pos, vec2 *dir) {
-  s->addTailNode();
-  s->tail->pos = pos;
-  s->tail->dir = dir;
-}
-
-void StartSnake() {
+// prepares snake for gamemode
+void InitializeSnake() {
   lastUpdate = 0;
   for (uint8_t i = 0; i<4; i++) {
-    NewSnakeNode(SnakeGame, new vec2(OLEDWIDTH/2,(OLEDHEIGHT/2)+i), new vec2(0,-1));
-  }
+    // add nodes to snake
+    // Do I need to set the ptrs to point as something first?
+    SnakeGame->addTailNode(vec2(OLEDWIDTH/2,(OLEDHEIGHT/2)-i), vec2(0,-1));
+  } 
 
+  snakeFruit.x = random(0+3,OLEDWIDTH-3);
+  snakeFruit.y = random(0+3,OLEDHEIGHT-3);
 }
 
-bool isSnakeDirValid(vec2 dir) {
-  vec2 nextPos = add(*(SnakeGame->head->pos), dir);
+//
+bool isSnakeDirValid() {
+  /*
+  vec2 dir = (SnakeGame->head->pos)
   if ( !OLEDGetPixel(OLED, nextPos) ) {
     return true;
   } else if ( (nextPos.x == snakeFruit.x) && (nextPos.y == snakeFruit.y) ) {
     score++;
     return true;
   } else return false;
+  */
+}
+
+bool isTimeForNextFrame() {
 
 }
 
-// Pass pixel info to DrawNextFrame
+// Compute logic for next frame; this function does these things:
+// - Change position and direction of nodes
+// - Increment scores and snake length
+// - Draws and erases pixels
 void SnakeNextFrame(vec2 dir) {
   // calculate when next frame
   // is it time for next frame?
-  if (false) return;
 
   //DrawNextFrame(OLED);
 
@@ -454,7 +466,7 @@ RotaryEncoder PollRotaryEnc() {
 }
 
 // ---- UTILITY FUNCTIONS ---- //
-// 
+
 bool isButtonPressed(bool* buttonState, uint8_t buttonPin) {
   uint8_t currentState = ((uint8_t)(*buttonState)<<1) | digitalRead(buttonPin);
   // Button isn't pressed and state is false - return 0
@@ -477,10 +489,22 @@ bool isButtonPressed(bool* buttonState, uint8_t buttonPin) {
   
 }
 
-vec2 GetJoystickAxes(const uint8_t PinA, const uint8_t PinB) {
-  uint16_t joyX = analogRead(PinA);
-  uint16_t joyY = analogRead(PinB);
+// Returns a vec2 of the analogRead inputs of the given pins
+vec2 GetJoystickAxes(const uint8_t joystickXPin, const uint8_t joystickYPin) {
+  uint16_t joyX = analogRead(joystickXPin);
+  uint16_t joyY = analogRead(joystickYPin);
   return vec2(joyX,joyY);
+}
+
+// Return a vec2 of the current direction the analog stick is pointing in
+vec2 GetJoystickDir(const uint8_t joystickXPin, const uint8_t joystickYPin) {
+  vec2 axesVals = GetJoystickAxes(joystickXPin, joystickYPin);
+  // I switched the physical pins since the joystick is rotated; as a result, the y-axis vals are flipped
+  if (axesVals.x > 3*1023/5) axesVals.x = 1;
+  if (axesVals.x < 2*1023/5) axesVals.x = -1;
+  if (axesVals.y > 3*1023/5) axesVals.y = -1;
+  if (axesVals.y < 2*1023/5) axesVals.y = 1;
+  return axesVals;
 }
 
 bool OLEDGetPixel(Adafruit_SSD1306 display, vec2 v) {
