@@ -2,8 +2,9 @@
   #pragma once
   // Libraries
   #include <Adafruit_SSD1306.h>
+  //#include <Adafruit_SSD1306_EMULATOR.h>
   #include <splash.h>
-  #include <LiquidCrystal.h>
+  //#include <LiquidCrystal.h>
 
   #include "LinkedList.h"
 
@@ -31,6 +32,7 @@
 //---- END OF SCREEN DFINITIONS ----//
 //---- PIN DEFINITIONS ----//
   // LCD Display (ONLY 11-13 ARE USED DUE TO USING THE SHIFT REGISTER)
+  /*
   #define LCDDS                 11
   #define LCDSHCP               13
   #define LCDSTCP               12
@@ -40,6 +42,7 @@
   #define D5                    5
   #define D6                    6
   #define D7                    7
+  */
   // OLED Display (Definitions not used - just for reference)
   #define SDA                   A4  // Data
   #define SCL                   A5  // CLK
@@ -54,11 +57,11 @@
 
 //---- DATA STRUCTURING ----//
   // ENUM DEFS
-  enum LCDAlignment             { left, center, right };
+  //enum LCDAlignment             { left, center, right };
   enum EmulatorState            { selection, snake, pong, tron, doom };
   enum GameState                { unactivated, activated, playing, failure = -1 };
   enum RotaryEncoder            { ccw = -1, none, cw, clk };
-
+  /*
   struct LCDText {
     LCDText(String t, LCDAlignment a);
     // String to be printed to the LCD display
@@ -68,7 +71,7 @@
     // Row String is to be printed to
     // int row = 0
   };
-
+  */
 
   int rotEncOldPos = 0;
   int rotEncCurPos = 0;
@@ -83,7 +86,7 @@
 //---- END OF DATA STRUCTURES ----//
 
 Adafruit_SSD1306 OLED(OLEDWIDTH, OLEDHEIGHT);
-LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
+//LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
 //Adafruit_LiquidCrystal lcd(0);
 
 enum EmulatorState emu = selection;
@@ -111,12 +114,12 @@ void setup() {
   pinMode(BUTTONPIN, INPUT);
 
   Serial.begin(9600);
-
+  /*
   // lcd init
   lcd.begin(LCDCOLUMNS, LCDROWS);
   lcd.noCursor();
   lcd.clear();
-
+  */
   
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
   if(!OLED.begin(SSD1306_SWITCHCAPVCC, 0x3D)) {
@@ -142,7 +145,8 @@ void setup() {
   t1 = millis();
   lastUpdate = 0;
 
-  LCDSelectGame(gameSelect);
+  //LCDSelectGame(gameSelect);
+  OLEDSelectGame(gameSelect);
 }
 
 void loop() {
@@ -171,7 +175,8 @@ void loop() {
       default:
         // EmulatorStates game states start at 1 and not 0 -> set to multiple of 3 before modulus and increment 1 after 
         gameSelect = ((gameSelect + 2 + rotEncInput) % 3) + 1;
-        LCDSelectGame(gameSelect);
+        //LCDSelectGame(gameSelect);
+        OLEDSelectGame(gameSelect);
       break;
     }
   }
@@ -287,16 +292,36 @@ void loop() {
 }
 
 // ---- CONSTRUCTORS ---- //
+/*
   LCDText::LCDText(String text, LCDAlignment align) { //, int row) {
     this->text = text;
     this->align = align;
     // this->row = row
   }
-
+*/
 // ---- END OF CONSTRUCTORS ---- //
 
+/*
 void LCDSelectGame(EmulatorState game) {
   LCDPrint(lcd, LCDText("Selected Game:", center), LCDText(EmuStateToString(game), center));
+}
+*/
+void DrawGameOptions() {
+  OLED.clearDisplay();
+  OLED.setTextColor(1);
+  OLED.setTextSize(2);
+  for (uint8_t i = 1; i<=3; i++) {
+    vec2 padding(0,0);
+    padding.x = ( OLEDWIDTH - (2 * OLEDLETTERW * EmuStateToString(EmulatorState(i)).length()) ) / 2;
+    padding.y = ( (2*i - 1) * OLEDHEIGHT / 3) - (2 * OLEDLETTERH) );
+
+    OLED.setCursor(padding.x, padding.y);
+    OLED.print(EmuStateToString(EmulatorState(i)));
+  }
+}
+
+void OLEDSelectGame(EmulatorState eState) {
+
 }
 
 // Boots up the game that the input EmulatorState is currently set to
@@ -307,7 +332,7 @@ void BootGame(EmulatorState game) {
   *(gState) = activated;
   Serial.println("Activated!");
   delay(100);
-  LCDPrint(lcd, LCDText("Running:", center), LCDText(EmuStateToString(game), center));
+  //LCDPrint(lcd, LCDText("Running:", center), LCDText(EmuStateToString(game), center));
 
   // TODO - Draw logo? lol
   delay(200);
@@ -322,28 +347,28 @@ void DrawGameMenu(EmulatorState game) {
   OLED.setTextColor(1);
   OLED.setTextSize(3);
 
-  uint8_t padding[2] = {0,0}; 
+  vec2 padding(0,0); 
   // center game title text horizontally
-  padding[0] = (OLEDWIDTH - (EmuStateToString(game).length() * 3 * OLEDLETTERW)) / 2;
+  padding.x = (OLEDWIDTH - (EmuStateToString(game).length() * 3 * OLEDLETTERW)) / 2;
   // have bottom line of text on middle horizontal
-  padding[1] = (OLEDHEIGHT / 2) - (3 * OLEDLETTERH);
+  padding.y = (OLEDHEIGHT / 2) - (3 * OLEDLETTERH);
   
-  OLED.setCursor(padding[0], padding[1]);
+  OLED.setCursor(padding.x, padding.y);
   OLED.print(EmuStateToString(game));
 
   OLED.setTextSize(2);
   
   // play button
-  padding[0] = playButtonX0;
-  padding[1] = menuButtonY;
-  OLED.setCursor(padding[0], padding[1]);
+  padding.x = playButtonX0;
+  padding.y = menuButtonY;
+  OLED.setCursor(padding.x, padding.y);
   OLED.print("Play");
 
   // quit button
-  padding[0] = quitButtonX0;
+  padding.x = quitButtonX0;
   // y coord is the same
   //padding[1] = (3 * OLEDHEIGHT / 4) - (OLEDLETTERH + OLEDHEIGHT/32);
-  OLED.setCursor(padding[0], padding[1]);
+  OLED.setCursor(padding.x, padding.y);
   OLED.print("Quit");
   // FEATURE - Add Scoreboard?
   OLED.display();
@@ -578,6 +603,7 @@ void DrawNextFrame(Adafruit_SSD1306 display, uint16_t pNum, vec2 pixel, ...) {
   display.display();
 }
 
+/*
 // Prints Strings to an input LCD display and adjusts the text positioning based on an input LCDText data structure
 // - Text that is longer than the column number will be cut off (limited to a max of 128 columns)
 // - Any args provided that surpass the row number will not be used (limited to a max of 128 rows)
@@ -608,3 +634,4 @@ void LCDPrint(LiquidCrystal LCD, ...) {
   }
   va_end(textList);
 }
+*/
