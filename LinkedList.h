@@ -1,5 +1,4 @@
 #include <stdint.h>
-
 //---- VEC2 DECLARATIONS ----//
 struct vec2 {
   vec2();
@@ -8,11 +7,19 @@ struct vec2 {
   int16_t x, y;
   void add(vec2 v);
   void add(vec2 *v);
-  inline vec2 operator+(vec2 v);
-  inline vec2 operator-(vec2 v);
-  inline vec2 operator*(int n);
-  inline vec2 operator/(int n);
-  inline bool operator==(vec2 v);
+  inline vec2 operator+(const vec2& v);
+  inline vec2 operator-(const vec2& v);
+  inline vec2 operator*(const int& n);
+  inline vec2 operator/(const int& n);
+  inline vec2& operator=(const vec2& v);
+  //inline vec2 operator>>(const int& n);
+  //inline vec2 operator<<(const int& n);
+  //inline vec2& operator+(const vec2& v);
+  //inline vec2& operator-(const vec2& v);
+  //inline vec2& operator*(const int& n);
+  //inline vec2& operator/(const int& n);
+  //inline vec2& operator=(const vec2& v);
+  inline bool operator==(const vec2& v);
 };
 
 vec2::vec2() { //, int16_t color) {
@@ -27,35 +34,85 @@ vec2::vec2(int16_t x, int16_t y) { //, int16_t color) {
   //this->color = color;
 }
 
-vec2 vec2::operator+(vec2 v) {
-  vec2 newV;
+vec2 vec2::operator+(const vec2& v) {
+  vec2 newV = vec2();
   newV.x = this->x + v.x;
   newV.y = this->y + v.y;
   return newV;
 }
 
-vec2 vec2::operator-(vec2 v) {
-  vec2 newV;
+vec2 vec2::operator-(const vec2& v) {
+  vec2 newV = vec2();
   newV.x = this->x - v.x;
   newV.y = this->y - v.y;
   return newV;
 }
 
-vec2 vec2::operator*(int n) {
-  vec2 newV;
+vec2 vec2::operator*(const int& n) {
+  vec2 newV = vec2();
   newV.x = this->x * n;
   newV.y = this->y * n;
   return newV;
 }
 
-vec2 vec2::operator/(int n) {
-  vec2 newV;
+vec2 vec2::operator/(const int& n) {
+  vec2 newV = vec2();
   newV.x = this->x / n;
   newV.y = this->y / n;
   return newV;
 }
 
-bool vec2::operator==(vec2 v) {
+vec2& vec2::operator=(const vec2& v) {
+  this->x = v.x;
+  this->y = v.y;
+  return *this;
+}
+/*
+vec2 vec2::operator>>(const int& n) {
+  vec2 newV = vec2();
+  newV.x = (this->x)>>n;
+  newV.y = (this->y)>>n;
+  return newV;
+}
+
+vec2 vec2::operator<<(const int& n) {
+  vec2 newV = vec2();
+  newV.x = (this->x)<<n;
+  newV.y = (this->y)<<n;
+  return newV;
+}
+/*
+vec2& vec2::operator+(const vec2& v) {
+  this->x = this->x + v.x;
+  this->y = this->y + v.y;
+  return *this;
+}
+
+vec2& vec2::operator-(const vec2& v) {
+  this->x = this->x - v.x;
+  this->y = this->y - v.y;
+  return *this;
+}
+
+vec2& vec2::operator*(const int& n) {
+  this->x = this->x * n;
+  this->y = this->y * n;
+  return *this;
+}
+
+vec2& vec2::operator/(const int& n) {
+  this->x = this->x / n;
+  this->y = this->y / n;
+  return *this;
+}
+
+vec2& vec2::operator=(const vec2& v) {
+  this->x = v.x;
+  this->y = v.y;
+  return *this;
+}
+*/
+bool vec2::operator==(const vec2& v) {
   return ( (this->x == v.x) && (this->y == v.y) );
 }
 
@@ -116,8 +173,8 @@ struct LinkedList {
   LinkedList();
   LinkedList(unsigned int size);
   ~LinkedList();
-  void removeNode(unsigned int index);
-  void addNode(unsigned int index);
+  //void removeNode(unsigned int index);
+  //void addNode(unsigned int index);
   Node* addHeadNode();
   Node* addHeadNode(vec2 pos, vec2 dir);
   Node* addTailNode();
@@ -127,7 +184,7 @@ struct LinkedList {
   Node* removeTailNode();
   void destroyTailNode();
   void moveBackToFront();
-  void moveBackToFront(vec2 *newDir);
+  void moveBackToFront(vec2& newPos);
   void destroyList();
   void destroyList(uint8_t dir);
   Node* pop();
@@ -268,8 +325,6 @@ void LinkedList::destroyList(uint8_t dir) {
     n = this->tail;
     while (n != nullptr) {
       if (n->next == nullptr) {
-        delete n->dir;
-        delete n->pos;
         delete n;
         n = nullptr;
       } else {
@@ -281,8 +336,6 @@ void LinkedList::destroyList(uint8_t dir) {
     n = this->head;
     while (n != nullptr) {
       if (n->prev == nullptr) {
-        delete n->dir;
-        delete n->pos;
         delete n;
         n == nullptr;
       } else {
@@ -299,7 +352,7 @@ Node* LinkedList::pop() {
 
 void LinkedList::push(Node* nodeptr) {
   this->head->next = nodeptr;
-  nodeptr->prev = head;
+  nodeptr->prev = this->head;
   this->head = nodeptr;
   this->size++;
 }
@@ -316,11 +369,10 @@ void LinkedList::moveBackToFront() {
   this->push(oldTail);
 }
 // Move node to front with dif direction
-void LinkedList::moveBackToFront(vec2 *newDir) {
+void LinkedList::moveBackToFront(vec2& newPos) {
   Node *oldTail = removeTailNode();
-
-  oldTail->pos->add(newDir);
-  oldTail->dir = newDir;
+  *(oldTail->pos) = newPos;
+  *(oldTail->dir) = newPos - (*this->head->pos);
   
   this->push(oldTail);
 }
