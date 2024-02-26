@@ -5,7 +5,7 @@
   //#include <Adafruit_SSD1306_EMULATOR.h>
   #include <splash.h>
   //#include <LiquidCrystal.h>
-  #include <string.h>
+  //#include <WString.h>
 
   #include "LinkedList.h"
 
@@ -90,6 +90,7 @@
 //---- END OF DATA STRUCTURES ----//
 
 Adafruit_SSD1306 OLED(OLEDWIDTH, OLEDHEIGHT);
+//Adafruit_SSD1306_EMULATOR OLED(OLEDWIDTH, OLEDHEIGHT);
 //LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
 //Adafruit_LiquidCrystal lcd(0);
 
@@ -149,6 +150,8 @@ void setup() {
   //t1 = millis();
   lastUpdate = 0;
 
+  SnakeGame = new LinkedList();
+
   //LCDSelectGame(gameSelect);
   DrawGameOptions();
   OLEDSelectGame(gameSelect);
@@ -171,7 +174,8 @@ void loop() {
       case (clk):
         emu = gameSelect;
         rotEncInput = none;
-        Serial.println(EmuStateToString(emu) + " Selected");
+        //Serial.print(EmuStateToString(emu));
+        //Serial.println(" Selected");
       break;
 
       case (none):
@@ -204,12 +208,10 @@ void loop() {
 
       // Menu Selection
       case (activated):
-        //delay(200);
-        //Serial.println("Game Playing Time!");
-        //delay(200);
         GameMenuSelect();
         // if play, run game initalizer
         if (isButtonPressed(&buttonClk, BUTTONPIN)) {
+          //Serial.println("Button Pressed");
           if (isPlaySelected) InitializeSnake();
           else QuitGame(&emu);
         }
@@ -244,7 +246,7 @@ void loop() {
 
 
   if (emu == pong) {
-    Serial.println("Emu is pong");
+    //Serial.println("Emu is pong");
     switch (game2) {
       // boot game
       case (unactivated):
@@ -273,7 +275,7 @@ void loop() {
 
 
   if (emu == tron) {
-    Serial.println("Emu is tron");
+    //Serial.println("Emu is tron");
     switch (game3) {
       // boot game
       case (unactivated):
@@ -319,14 +321,13 @@ void LCDSelectGame(EmulatorState game) {
 }
 */
 void DrawGameOptions() {
-  Serial.println("Drawn");
+  //Serial.println("Drawn");
   OLED.clearDisplay();
   OLED.setTextColor(1);
   OLED.setTextSize(2);
   for (int i = 1; i<=3; i++) {
-    Serial.println(String(i));
     vec2 padding(0,0);
-    padding.x = ( OLEDWIDTH - (2 * OLEDLETTERW * EmuStateToString(EmulatorState(i)).length()) ) / 2;
+    padding.x = ( OLEDWIDTH - (2 * OLEDLETTERW * length(EmuStateToString(EmulatorState(i))) ) ) / 2;
     padding.y = ( (2*i - 1) * OLEDHEIGHT / 6) - (OLEDLETTERH);
     OLED.setCursor(padding.x, padding.y);
     OLED.print(EmuStateToString(EmulatorState(i)));
@@ -356,7 +357,7 @@ void OLEDSelectGame(EmulatorState eState) {
 
 // Boots up the game that the input EmulatorState is currently set to
 void BootGame(EmulatorState game) {
-  Serial.println("Game Booting!");
+  Serial.println(F("Game Booting!"));
   GameState *gState = EmuStateToGameState(game);
   // sets the GameState of that selected game to activated
   *(gState) = activated;
@@ -376,12 +377,12 @@ void DrawGameMenu(EmulatorState game) {
 
   vec2 padding(0,0); 
   // center game title text horizontally
-  padding.x = (OLEDWIDTH - (EmuStateToString(game).length() * 3 * OLEDLETTERW)) / 2;
+  padding.x = (OLEDWIDTH - (length((EmuStateToString(game))) * 3 * OLEDLETTERW)) / 2;
   // have bottom line of text on middle horizontal
   padding.y = (OLEDHEIGHT / 2) - (3 * OLEDLETTERH);
   
   OLED.setCursor(padding.x, padding.y);
-  OLED.print(EmuStateToString(game).c_str());
+  OLED.print(EmuStateToString(game));
 
   OLED.setTextSize(2);
   
@@ -389,17 +390,16 @@ void DrawGameMenu(EmulatorState game) {
   padding.x = playButtonX0;
   padding.y = menuButtonY;
   OLED.setCursor(padding.x, padding.y);
-  OLED.print("Play");
+  OLED.print(F("Play"));
 
   // quit button
   padding.x = quitButtonX0;
   // y coord is the same
   //padding[1] = (3 * OLEDHEIGHT / 4) - (OLEDLETTERH + OLEDHEIGHT/32);
   OLED.setCursor(padding.x, padding.y);
-  OLED.print("Quit");
+  OLED.print(F("Quit"));
   // FEATURE - Add Scoreboard?
   OLED.display();
-  Serial.println("Displaying!");
 }
 
 void GameMenuSelect() {
@@ -430,8 +430,9 @@ void DrawMenuLine(bool doDrawPlay) {
 // Quits the selected game given an input 
 // - sets the EmulatorState and GameState variables back to default states
 void QuitGame(EmulatorState *emuState) {
-  Serial.println("Quitting");
+  Serial.println(F("Quitting"));
   DrawGameOptions();
+  OLEDSelectGame(gameSelect);
   // Sets GameState variable to unactivated
   (*EmuStateToGameState(*emuState)) = unactivated;
   // resets given emulator state
@@ -450,9 +451,9 @@ GameState* EmuStateToGameState(EmulatorState emuState) {
   } else if (emuState == tron) {
     return &game3;
   } else if (emuState == doom) {
-    Serial.println("EmuState is DOOM");
+    //Serial.println("EmuState is DOOM");
   } else {
-    Serial.println("EmuState is null");
+    //Serial.println("EmuState is null");
     return nullptr;
   }
 }
@@ -460,17 +461,30 @@ GameState* EmuStateToGameState(EmulatorState emuState) {
 // prepares snake for gamemode
 void InitializeSnake() {
   lastUpdate = 0;
+  Serial.print(F("Initial Size: "));
+  Serial.println(SnakeGame->size);
   for (uint8_t i = 0; i<4; i++) {
     // add nodes to snake
-    SnakeGame->addTailNode(vec2(OLEDWIDTH/2,(OLEDHEIGHT/2)-i), vec2(0,-1));
+    SnakeGame->addTailNode(vec2(OLEDWIDTH/2,(OLEDHEIGHT/2)+i), vec2(0,-1));
+    //Serial.println("Node Created");
+    Serial.println(SnakeGame->size);
   } 
 
   snakeFruit.x = random(0+3,OLEDWIDTH-3);
   snakeFruit.y = random(0+3,OLEDHEIGHT-3);
 
-  OLED.fillRect(1, 1, 126, 62, 1);
+  OLED.fillRect(1, 1, 126, 62, 0);
+  
+  Serial.print(F("Snake Size: "));
+  Serial.println(SnakeGame->size);
+  Node* n = SnakeGame->head;
+  for (uint8_t i = 0; i < SnakeGame->size; i++) {
+    DrawPixel(OLED, *(n->pos), 1);
+    n = n->prev;
+    Serial.println(F("Node Drawn"));
+  }
 
-
+  //game1 = playing;
 }
 
 vec2 SnakeNextPos() {
@@ -513,7 +527,7 @@ void SnakeNextFrame(vec2 pos) {
   } else {
     DrawPixel(OLED, *(SnakeGame->tail->pos), 0);
     SnakeGame->moveBackToFront();
-    DrawPixel(OLED, pos, 1);
+    DrawPixel(OLED, *(SnakeGame->head->pos), 1);
   }
 
   OLED.display();
@@ -549,9 +563,15 @@ void RGBLED(uint16_t RPin, uint16_t GPin, uint16_t BPin, uint16_t Rval, uint16_t
   analogWrite(BPin,Bval);
 }
 
+inline unsigned int length(const char *c) {
+  unsigned int size = 0;
+  while(c[size] != '\0') size++;
+  return size;
+}
 
 // Draws pixel into the buffer given an OLED display, vec2 position, and color
 void DrawPixel(Adafruit_SSD1306 display, vec2 pos, uint16_t c) {
+//void DrawPixel(Adafruit_SSD1306_EMULATOR display, vec2 pos, uint16_t c) {
   display.drawPixel(pos.x, pos.y, c);
 }
 
@@ -595,26 +615,24 @@ vec2 GetJoystickDir(const uint8_t joystickXPin, const uint8_t joystickYPin) {
   return axesVals;
 }
 
-bool OLEDGetPixel(Adafruit_SSD1306 display, vec2 v) {
-  return display.getPixel(v.x, v.y);
-}
-
 // Returns time in milliseconds since last frame
-unsigned long MillisToFrameTime(unsigned long time0, unsigned long time1) { return (time1-time0); }
+//unsigned long MillisToFrameTime(unsigned long time0, unsigned long time1) { return (time1-time0); }
 
 // Converts the EmulatorState enum to a String
-String EmuStateToString (EmulatorState state) {
+const char* EmuStateToString (EmulatorState state) {
+  const char *c;
   if (state == snake) {
-    return "Snake";
+    c = "Snake";
   } else if (state == pong) {
-    return "Pong";
+    c = "Pong";
   } else if (state == tron) {
-    return "Tron";
+    c = "Tron";
   } else if (state = doom) {
-    return "Doom";
+    c = "Doom";
   } else {
-    return "Selection";
+    c = "Selection";
   }
+  return c;
 }
 
 // Checks the Rotary Encoder Pins and returns the state number
