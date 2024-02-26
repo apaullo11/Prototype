@@ -21,6 +21,7 @@
   #define OLEDHEIGHT            64
   #define OLEDLETTERW           6
   #define OLEDLETTERH           8
+  #define BASEFRAMETIME         150 // in milliseconds
   // Play is centered roughly a fourth of the way across the screen, accounting for text size
   const uint8_t playButtonX0 = (OLEDWIDTH / 4) - (2 * 2 * OLEDLETTERW);
   const uint8_t playButtonX1 = (OLEDWIDTH / 4) + (2 * 2 * OLEDLETTERW);
@@ -53,7 +54,7 @@
   #define JOYSTICKCLK           7
   #define ROTARYENCPINA         9   // DT
   #define ROTARYENCPINB         10  // SW
-  #define BUTTONPIN             8
+  #define BUTTONPIN             13
   #define RGBPINR               3
   #define RGBPING               5
   #define RGBPINB               6
@@ -227,7 +228,8 @@ void loop() {
             if (isSnakeDirValid(pos)) {
               SnakeNextFrame(pos);
             } else {
-              GameOver();
+              Serial.println(F("Game Over!"));
+              game1 = failure;
             }
           }
         break;
@@ -235,10 +237,11 @@ void loop() {
       // game over
       case (failure):
         // remove linked list
+        GameOver();
       break;
 
       default:
-        Serial.println("Game State invalid");
+        Serial.println(F("Game State invalid"));
       break;
     }
   }
@@ -305,21 +308,6 @@ void loop() {
   //Serial.println(String(emu));
 }
 
-// ---- CONSTRUCTORS ---- //
-/*
-  LCDText::LCDText(String text, LCDAlignment align) { //, int row) {
-    this->text = text;
-    this->align = align;
-    // this->row = row
-  }
-*/
-// ---- END OF CONSTRUCTORS ---- //
-
-/*
-void LCDSelectGame(EmulatorState game) {
-  LCDPrint(lcd, LCDText("Selected Game:", center), LCDText(EmuStateToString(game), center));
-}
-*/
 void DrawGameOptions() {
   //Serial.println("Drawn");
   OLED.clearDisplay();
@@ -437,9 +425,14 @@ void QuitGame(EmulatorState *emuState) {
   (*EmuStateToGameState(*emuState)) = unactivated;
   // resets given emulator state
   *emuState = selection;
+  isPlaySelected = true;
 }
 
 void GameOver() {
+  SnakeGame->destroyList();
+  game1 = activated;
+  DrawGameMenu(emu);
+  DrawMenuLine(isPlaySelected);
 }
 
 // Takes in an emulator state and returns a pointer to the respective GameState variable
@@ -461,13 +454,9 @@ GameState* EmuStateToGameState(EmulatorState emuState) {
 // prepares snake for gamemode
 void InitializeSnake() {
   lastUpdate = 0;
-  Serial.print(F("Initial Size: "));
-  Serial.println(SnakeGame->size);
-  for (uint8_t i = 0; i<4; i++) {
+  for (uint8_t i = 0; i<6; i++) {
     // add nodes to snake
     SnakeGame->addTailNode(vec2(OLEDWIDTH/2,(OLEDHEIGHT/2)+i), vec2(0,-1));
-    //Serial.println("Node Created");
-    Serial.println(SnakeGame->size);
   } 
 
   snakeFruit.x = random(0+3,OLEDWIDTH-3);
@@ -475,27 +464,42 @@ void InitializeSnake() {
 
   OLED.fillRect(1, 1, 126, 62, 0);
   
-  Serial.print(F("Snake Size: "));
-  Serial.println(SnakeGame->size);
   Node* n = SnakeGame->head;
   for (uint8_t i = 0; i < SnakeGame->size; i++) {
     DrawPixel(OLED, *(n->pos), 1);
     n = n->prev;
-    Serial.println(F("Node Drawn"));
   }
 
-  //game1 = playing;
+  DrawPixel(OLED, snakeFruit, 1);
+  OLED.display();
+
+  game1 = playing;
 }
 
 vec2 SnakeNextPos() {
-  // direction of previous body node
+  // vector direction of previous body node
   vec2 bodyDir = *(SnakeGame->head->prev->pos) - *(SnakeGame->head->pos);
-  if (((*(SnakeGame->head->dir) + bodyDir).x == 0) && ((*(SnakeGame->head->dir) + bodyDir).y == 0)) return (bodyDir * -1);
-  else return ((*(SnakeGame->head->dir) + bodyDir) / 2);
+  vec2 nextDir = (*(SnakeGame->head->dir)*2) + bodyDir;
+  Serial.print("Body Dir at: ");
+  Serial.print(bodyDir.x);
+  Serial.print(", ");
+  Serial.println(bodyDir.y);
+  // remove magnitude of vector on the line from the head to the previous node
+  if (abs(nextDir.x) >= 3) nextDir.x = 0;
+  if (abs(nextDir.y) >= 3) nextDir.y = 0;
+  nextDir = (nextDir/2);
+  vec2 newPos;
+  // if dir is zero, set new pos to front
+  if ((nextDir.x == 0) && (nextDir.y == 0)) newPos = *(SnakeGame->head->pos) - bodyDir;
+  else newPos = *(SnakeGame->head->pos) + nextDir;
+
+  return newPos;
 }
 
 //
 bool isSnakeDirValid(vec2 newPos) {
+  if ((newPos.x>(OLEDWIDTH-3)) || (newPos.x<2))  return false;
+  if ((newPos.y>(OLEDHEIGHT-3)) || (newPos.y<2))  return false;
   Node* snakeNode = SnakeGame->head->prev;
   for (uint8_t i = 1; i < SnakeGame->size; i++) {
     if (*(snakeNode->pos) == newPos) {
@@ -509,11 +513,12 @@ bool isSnakeDirValid(vec2 newPos) {
 
 // Uses internal millisecond tracking to check if it is time for the next tick in game logic
 bool tick() {
-  unsigned int frameTime = 200 / gameSpeed;
+  unsigned int frameTime = BASEFRAMETIME / gameSpeed;
   if ((millis() - lastUpdate) >= frameTime) {
     lastUpdate = millis();
+    //Serial.println(F("Next Frame"));
     return true;
-  }
+  } else return false;
 }
 
 // Compute logic for next frame; this function does these things:
@@ -524,9 +529,14 @@ void SnakeNextFrame(vec2 pos) {
     SnakeGame->addHeadNode(pos, *(SnakeGame->head->dir));
     snakeFruit.x = random(0+3,OLEDWIDTH-3);
     snakeFruit.y = random(0+3,OLEDHEIGHT-3);
+    Serial.println("fruit");
+    //Serial.print("Snake fruit achieved at: ");
+    //Serial.print(pos.x);
+    //Serial.print(", ");
+    //Serial.println(pos.y);
   } else {
     DrawPixel(OLED, *(SnakeGame->tail->pos), 0);
-    SnakeGame->moveBackToFront();
+    SnakeGame->moveBackToFront(pos);
     DrawPixel(OLED, *(SnakeGame->head->pos), 1);
   }
 
@@ -546,12 +556,6 @@ RotaryEncoder PollRotaryEnc() {
     //Serial.println(String(dir>>2));
     return RotaryEncoder(dir>>2);
   }
-  /*
-  if ( (rotEncClk != digitalRead(ROTARYENCCLK)) && (rotEncClk == HIGH) ) {
-    rotEncClk = digitalRead(ROTARYENCCLK);
-    return clk;
-  }
-  */
   return RotaryEncoder(0);
 }
 
@@ -607,12 +611,19 @@ vec2 GetJoystickAxes(const uint8_t joystickXPin, const uint8_t joystickYPin) {
 // Return a vec2 of the current direction the analog stick is pointing in
 vec2 GetJoystickDir(const uint8_t joystickXPin, const uint8_t joystickYPin) {
   vec2 axesVals = GetJoystickAxes(joystickXPin, joystickYPin);
+  vec2 dirVals = vec2();
   // I switched the physical pins since the joystick is rotated; as a result, the y-axis vals are flipped
-  if (axesVals.x > 3*1023/5) axesVals.x = 1;
-  if (axesVals.x < 2*1023/5) axesVals.x = -1;
-  if (axesVals.y > 3*1023/5) axesVals.y = -1;
-  if (axesVals.y < 2*1023/5) axesVals.y = 1;
-  return axesVals;
+  if (axesVals.x > 3*1023/5) dirVals.x = -1;
+  if (axesVals.x < 2*1023/5) dirVals.x = 1;
+  if (axesVals.y > 3*1023/5) dirVals.y = 1;
+  if (axesVals.y < 2*1023/5) dirVals.y = -1;
+  /*
+  Serial.print("Joystick Dir is: ");
+  Serial.print(dirVals.x);
+  Serial.print(", ");
+  Serial.println(dirVals.y);
+  */
+  return dirVals;
 }
 
 // Returns time in milliseconds since last frame
@@ -665,7 +676,7 @@ int8_t GetRotaryKnobDir(uint8_t *oldState, const uint8_t PinA, const uint8_t Pin
   (*oldState) = curState;
   return knobDir;
 }
-
+/*
 // Draws the next frame of a monochrome Adafruit SSD1306 OLED display
 // - Takes the input of the Adafruit_SSD1306 object, an integer number of
 // - pixels to be drawn, and variable number of vec2 objects (max of 65535)
@@ -682,37 +693,5 @@ void DrawNextFrame(Adafruit_SSD1306 display, uint16_t pNum, vec2 pixel, ...) {
   va_end(vecList);
   // display pixels in buffer
   display.display();
-}
-
-/*
-// Prints Strings to an input LCD display and adjusts the text positioning based on an input LCDText data structure
-// - Text that is longer than the column number will be cut off (limited to a max of 128 columns)
-// - Any args provided that surpass the row number will not be used (limited to a max of 128 rows)
-// - Providing less args than are columns will result in undefined behaviour 
-void LCDPrint(LiquidCrystal LCD, ...) {
-  LCD.clear();
-  // prepare list of all args
-  va_list textList;
-  va_start(textList, LCD);
-  
-  for (uint8_t i = 0; i < LCDROWS; i++) {
-    // fetchs current and moves to next LCDText object
-    LCDText t = va_arg(textList, LCDText);
-
-    // set text indent based on input alignment - if length is greater than columns, set to 0
-    uint8_t indent = (LCDCOLUMNS < t.text.length()) ? 0 : (LCDCOLUMNS - t.text.length()) ; 
-    if (t.align == left) {
-      // no indent
-      indent = 0;
-    } else if (t.align == center) {
-      // half of column difference to center text
-      indent = indent/2;
-    }
-    // keep indent as column difference otherwise
-    Serial.println(t.text);
-    LCD.setCursor(indent,i);
-    LCD.print(t.text.c_str());
-  }
-  va_end(textList);
 }
 */
